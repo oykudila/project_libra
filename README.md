@@ -1,0 +1,1 @@
+fastAPI has libraries that correspond to Flask's libraries, like the blueprint in fastAPI being APIrouter.
