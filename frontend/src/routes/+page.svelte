@@ -29,8 +29,15 @@
             }),
         });
 
+        if (!response.ok) {
+            const errorText = await response.text();
+            assistantText = `Backend error ${response.status}: ${errorText}`;
+            loading = false;
+            return;
+        }
+
         const data = await response.json();
-        assistantText = data.assistantText;
+        assistantText = data.assistant_text;
         todos = data.todos;
         loading = false;
     }

@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-OPENAI_MODEL = os.getenv("AI_MODEL", "gpt-4.1-mini")
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4.1-mini")
 
 if not OPENAI_API_KEY:
     raise RuntimeError("OPENAI_API_KEY is missing from backend/.env.")
@@ -18,44 +18,40 @@ SYSTEM = (
 )
 
 PLAN_SCHEMA = {
-    "name": "plan_todos_v1",
-    "schema": {
-        "type": "object",
-        "additionalProperties": False,
-        "properties": {
-            "assistantText": {"type": "string"},
-            "todos": {
-                "type": "array",
-                "minimumItems": 1,
-                "maximumItems": 20,
-                "items": {
-                    "type": "object",
-                    "additionalProperties": False,
-                    "properties": {
-                        "id": {"type": "string"},
-                        "title": {"type": "string"},
-                        "notes": {"type": "string"},
-                        "status": {
-                            "type": "string",
-                            "enum": ["todo", "in progress", "done"],
-                        },
-                        "estimate": {"type": "string", "enum": ["S", "M", "L"]},
-                        "order": {"type": "integer", "minimum": 1},
+    "type": "object",
+    "additionalProperties": False,
+    "properties": {
+        "assistantText": {"type": "string"},
+        "todos": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 20,
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "id": {"type": "string"},
+                    "title": {"type": "string"},
+                    "notes": {"type": "string"},
+                    "status": {
+                        "type": "string",
+                        "enum": ["todo", "in progress", "done"],
                     },
-                    "required": [
-                        "id",
-                        "title",
-                        "notes",
-                        "status",
-                        "estimate",
-                        "order",
-                    ],
+                    "estimate": {"type": "string", "enum": ["S", "M", "L"]},
+                    "order": {"type": "integer", "minimum": 1},
                 },
+                "required": [
+                    "id",
+                    "title",
+                    "notes",
+                    "status",
+                    "estimate",
+                    "order",
+                ],
             },
         },
-        "required": ["assistantText", "todos"],
     },
-    "strict": True,
+    "required": ["assistantText", "todos"],
 }
 
 
@@ -85,21 +81,13 @@ async def generate_todos(goal: str, constraints: dict | None = None) -> dict:
     payload = {
         "model": OPENAI_MODEL,
         "instructions": SYSTEM,
-        "input": [
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "input_text",
-                        "text": json.dumps(user_prompt),
-                    }
-                ],
-            }
-        ],
+        "input": json.dumps(user_prompt),
         "text": {
             "format": {
                 "type": "json_schema",
-                "json_schema": PLAN_SCHEMA,
+                "name": "plan_todos_v1",
+                "schema": PLAN_SCHEMA,
+                "strict": True,
             }
         },
     }
@@ -113,16 +101,16 @@ async def generate_todos(goal: str, constraints: dict | None = None) -> dict:
             print("OpenAI error:", r.status_code, r.text)
         data = r.json()
 
-    out_text = None
-    for item in data.get("output", []):
-        for c in item.get("content", []):
-            if c.get("type") in ("output_text", "text"):
-                out_text = c.get("text")
-                break
-        if out_text:
-            break
+        chunks = []
+        for item in data.get("output", []):
+            for c in item.get("content", []):
+                if c.get("type") == "debug_info":
+                    chunks.append(c.get("text", ""))
 
+    out_text = "".join(chunks).strip()
     if not out_text:
-        raise RuntimeError("No output text found.")
+        raise RuntimeError(
+            "No output text found. Full response: {json.dumps(data)[:2000]}"
+        )
 
     return json.loads(out_text)
