@@ -1,7 +1,14 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
 npm-debug.log*
+venv/
 .env
+.env/
 .env.*
 !.env.example
+*.db
 backend/node_modules/
 backend/dist/
 backend/build/

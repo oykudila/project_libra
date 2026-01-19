@@ -17,33 +17,63 @@ SYSTEM = (
     "Do not include Markdown, comments, or any extra text outside the JSON."
 )
 
+PLAN_SCHEMA = {
+    "name": "plan_todos_v1",
+    "schema": {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "assistantText": {"type": "string"},
+            "todos": {
+                "type": "array",
+                "minimumItems": 1,
+                "maximumItems": 20,
+                "items": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "properties": {
+                        "id": {"type": "string"},
+                        "title": {"type": "string"},
+                        "notes": {"type": "string"},
+                        "status": {
+                            "type": "string",
+                            "enum": ["todo", "in progress", "done"],
+                        },
+                        "estimate": {"type": "string", "enum": ["S", "M", "L"]},
+                        "order": {"type": "integer", "minimum": 1},
+                    },
+                    "required": [
+                        "id",
+                        "title",
+                        "notes",
+                        "status",
+                        "estimate",
+                        "order",
+                    ],
+                },
+            },
+        },
+        "required": ["assistantText", "todos"],
+    },
+    "strict": True,
+}
+
 
 async def generate_todos(goal: str, constraints: dict | None = None) -> dict:
-    """Generate a list of todos to achieve a goal using OpenAI's API."""
     constraints = constraints or {}
 
-    prompt = {
+    user_prompt = {
         "goal": goal,
         "constraints": constraints,
-        "output_format": {
-            "assistantText": "string",
-            "todos": [
-                {
-                    "id": "t1",
-                    "title": "string",
-                    "notes": "string",
-                    "status": "todo",
-                    "estimate": "S|M|L",
-                    "order": 1,
-                }
-            ],
-        },
         "rules": [
             "Generate 8-15 todos.",
-            "Todos must be actionable and concrete.",
-            "Use status 'todo' for all items.",
+            "Todos must be specific and action-oriented (start with a verb).",
+            "Prefer small steps the user can complete in 1-3 hours.",
+            "Use simple sequential IDs: t1, t2, t3, ...",
+            "Use order starting at 1 and increment by 1 with no gaps.",
+            "Set status to 'todo' for all items initially.",
+            "Put any assumptions in notes (briefly).",
             "Use S/M/L estimates.",
-            "Order must start at 1 and increment by 1.",
         ],
     }
 
@@ -58,17 +88,29 @@ async def generate_todos(goal: str, constraints: dict | None = None) -> dict:
         "input": [
             {
                 "role": "user",
-                "content": [{"type": "input_text", "text": json.dumps(prompt)}],
+                "content": [
+                    {
+                        "type": "input_text",
+                        "text": json.dumps(user_prompt),
+                    }
+                ],
             }
         ],
-        "text": {"format": {"type": "json_object"}},
+        "text": {
+            "format": {
+                "type": "json_schema",
+                "json_schema": PLAN_SCHEMA,
+            }
+        },
     }
 
     async with httpx.AsyncClient(timeout=60.0) as client:
         r = await client.post(
             "https://api.openai.com/v1/responses", headers=headers, json=payload
         )
-        r.raise_for_status()
+
+        if r.status_code >= 400:
+            print("OpenAI error:", r.status_code, r.text)
         data = r.json()
 
     out_text = None
