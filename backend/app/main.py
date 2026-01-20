@@ -1,22 +1,42 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routes import plans
+
+from . import models
+from .database import Base, engine
+from .routes import projects, plans, tasks
 
 
-app = FastAPI(title="Todos Backend")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    Base.metadata.create_all(bind=engine)
+    yield
 
 
-@app.get("/health")
-def health():
-    return {"ok": True}
+def create_app() -> FastAPI:
+    app = FastAPI(lifespan=lifespan)
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+        ],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    @app.get("/health")
+    def health():
+        return {"status": "ok"}
+
+    app.include_router(projects.router)
+    app.include_router(plans.router)
+    app.include_router(tasks.router)
+
+    return app
 
 
-app.include_router(plans.router, prefix="/plans")
+app = create_app()

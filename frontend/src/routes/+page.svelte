@@ -36,10 +36,7 @@
             return;
         }
 
-        const data = await response.json();
-        assistantText = data.assistant_text;
-        todos = data.todos;
-        loading = false;
+        
     }
 </script>
 
