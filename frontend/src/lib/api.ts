@@ -24,6 +24,13 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     return (await res.json()) as T;
 }
 
+export async function deleteProject(projectId: number): Promise<{ ok: boolean }> {
+    const response = await fetch(`${BASE_URL}/projects/${projectId}`, {
+        method: "DELETE"
+    });
+    if (!response.ok) throw new Error(await response.text());
+    return await response.json();
+}
 
 // -----------------------------
 export type TaskStatus = "todo" | "doing" | "done";
@@ -52,7 +59,7 @@ export type TaskResponse = {
     description?: string | null;
     status: TaskStatus;
     due_date?: string | null;
-    size?: TaskSize | null;
+    estimate?: TaskSize | null;
     order_index: number;
     milestone_id?: number | null;
 };
@@ -76,7 +83,7 @@ export type TaskUpdateRequest = {
     description?: string | null;
     status?: TaskStatus | null;
     due_date?: string | null;
-    size?: TaskSize | null;
+    estimate?: TaskSize | null;
     order_index?: number | null;
     milestone_id?: number | null;
 };
@@ -115,7 +122,7 @@ export type ProposeTask = {
     milestone_index?: number | null;
     status: TaskStatus;
     due_date?: string | null;
-    size?: TaskSize | null;
+    estimate?: TaskSize | null;
     order_index: number;
 };
 
