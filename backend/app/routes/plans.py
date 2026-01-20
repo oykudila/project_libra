@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import Union
 
 from ..database import get_db
 from .. import models
@@ -8,15 +7,14 @@ from ..schemas import (
     PlanGenerateInput,
     PlanApplyInput,
     ProjectDetailResponse,
-    PlanQuestionsResponse,
     PlanResponse,
 )
-from ..ai import generate_plan_or_questions
+from ..ai import generate_plan
 
 router = APIRouter(prefix="/projects/{project_id}/plan", tags=["plans"])
 
 
-@router.post("/generate", response_model=Union[PlanQuestionsResponse, PlanResponse])
+@router.post("/generate", response_model=PlanResponse)
 def generate(
     project_id: int, payload: PlanGenerateInput, db: Session = Depends(get_db)
 ):
@@ -36,8 +34,10 @@ def generate(
         }
     )
 
-    result = generate_plan_or_questions(merge_defaults)
-    return result
+    try:
+        return generate_plan(merge_defaults)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"AI planning failed: {e}")
 
 
 @router.post("/apply", response_model=ProjectDetailResponse)
@@ -97,7 +97,7 @@ def apply(project_id: int, payload: PlanApplyInput, db: Session = Depends(get_db
         db.commit()
         db.refresh(project)
         return project
-    
+
     except HTTPException:
         db.rollback()
         raise

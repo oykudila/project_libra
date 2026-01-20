@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 from typing import Optional, List, Literal
 
-TaskStatus = Literal["todo", "doing", "done"]
+TaskStatus = Literal["todo", "in_progress", "done"]
 TaskSize = Literal["S", "M", "L"]
 
 
@@ -60,19 +60,8 @@ class PlanGenerateInput(BaseModel):
     deadline: Optional[str] = None
     hours_per_week: Optional[int] = None
     experience_level: Optional[Literal["beginner", "intermediate", "advanced"]] = None
-    detail_level: Optional[Literal["simple", "detailed"]] = "detailed"
+    detail_level: Optional[Literal["simple", "detailed"]] = "simple"
     constraints: Optional[str] = None
-
-
-class PlanQuestion(BaseModel):
-    id: str
-    question: str
-    field: str
-
-
-class PlanQuestionsResponse(BaseModel):
-    type: Literal["questions"]
-    questions: List[PlanQuestion]
 
 
 class ProposeMilestone(BaseModel):

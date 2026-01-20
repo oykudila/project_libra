@@ -1,211 +1,279 @@
 <script lang="ts">
-    import { onMount } from "svelte";
-    import {
-        createProject,
-        listProjects,
-        type ProjectResponse,
-    } from "$lib/api";
-    import { goto } from "$app/navigation";
+  import { onMount } from "svelte";
+  import { goto } from "$app/navigation";
 
-    let projects: ProjectResponse[] = [];
-    let loading = false;
-    let creating = false;
-    let error = "";
+  import {
+    Hero,
+    CreateProjectCard,
+    ProjectsSection,
+  } from "$lib/components/landing";
 
-    let title = "";
-    let goal_text = "";
-    let deadline = "";
-    let hours_per_week: number | null = null;
+  import {
+    createProject,
+    listProjects,
+    generatePlan,
+    applyPlan,
+    type ProjectResponse,
+    type GeneratePlanResponse,
+    type ProposeTask,
+    deleteProject,
+  } from "$lib/api";
 
-    async function refresh() {
-        loading = true;
-        error = "";
-        try {
-            projects = await listProjects();
-        } catch (e: unknown) {
-            error = e instanceof Error ? e.message : "Failed to load projects";
-        } finally {
-            loading = false;
-        }
+  let projects: ProjectResponse[] = [];
+  let loading = false;
+  let creating = false;
+  let error = "";
+
+  let title = "";
+  let goal_text = "";
+  let deadline = "";
+  let hours_per_week: number | null = null;
+
+  let createdId: number | null = null;
+  let generated: GeneratePlanResponse | null = null;
+
+  let typedTasks: ProposeTask[] = [];
+  let typing = false;
+  let typingTimer: ReturnType<typeof setTimeout> | null = null;
+
+  async function refresh() {
+    loading = true;
+    error = "";
+    try {
+      projects = await listProjects();
+    } catch (e: unknown) {
+      error = e instanceof Error ? e.message : "Failed to load projects";
+    } finally {
+      loading = false;
+    }
+  }
+
+  onMount(refresh);
+
+  function stopTyping() {
+    if (typingTimer !== null) {
+      clearTimeout(typingTimer);
+      typingTimer = null;
+    }
+    typing = false;
+  }
+
+  function startTypingTasks(tasks: ProposeTask[]) {
+    stopTyping();
+    typedTasks = [];
+    typing = true;
+
+    let i = 0;
+
+    function tick() {
+      typedTasks = [...typedTasks, tasks[i]];
+      i += 1;
+
+      if (i >= tasks.length) {
+        typing = false;
+        typingTimer = null;
+        return;
+      }
+
+      const delay = 180 + Math.random() * 270;
+      typingTimer = setTimeout(tick, delay);
     }
 
-    async function onCreate() {
-        error = "";
+    tick();
+  }
 
-        const t = title.trim();
-        const g = goal_text.trim();
-        const d = deadline.trim() ? deadline.trim() : null;
+  function resetGenerated() {
+    stopTyping();
+    createdId = null;
+    generated = null;
+    typedTasks = [];
+  }
 
-        if (!t || !g) {
-            error = "Title and goal are required.";
-            return;
-        }
+  async function onCreate() {
+    console.log("onCreate clicked - starting generation");
+    error = "";
 
-        const hpw =
-            hours_per_week === null
-                ? null
-                : Number.isFinite(hours_per_week) &&
-                    Number.isInteger(hours_per_week) &&
-                    hours_per_week >= 0
-                  ? hours_per_week
-                  : null;
-        if (hours_per_week !== null && hpw === null) {
-            error = "Hours per week must be a non-negative whole number.";
-            return;
-        }
+    const t = title.trim();
+    const g = goal_text.trim();
+    const d = deadline.trim() ? deadline.trim() : null;
+    const hpw =
+      hours_per_week === null
+        ? null
+        : Number.isFinite(hours_per_week) &&
+            Number.isInteger(hours_per_week) &&
+            hours_per_week >= 0
+          ? hours_per_week
+          : null;
 
-        creating = true;
-        try {
-            const p = await createProject({
-                title: t,
-                goal_text: g,
-                deadline: d,
-                hours_per_week: hpw,
-            });
-
-            title = "";
-            goal_text = "";
-            deadline = "";
-            hours_per_week = null;
-
-            await goto(`/projects/${p.id}`);
-        } catch (e: unknown) {
-            error = e instanceof Error ? e.message : "Failed to create project";
-        } finally {
-            creating = false;
-        }
+    if (!t || !g) {
+      error = "Title and goal are required.";
+      return;
     }
-    onMount(refresh);
+
+    creating = true;
+    resetGenerated();
+
+    try {
+      const created = await createProject({
+        title: t,
+        goal_text: g,
+        deadline: d,
+        hours_per_week: hpw,
+      });
+      createdId = created.id;
+
+      const plan = await generatePlan(created.id, {
+        goal_text: g,
+        deadline: d,
+        hours_per_week: hpw,
+        experience_level: "beginner",
+        detail_level: "simple",
+      });
+
+      generated = plan;
+
+      if (plan.type === "plan") {
+        startTypingTasks(plan.tasks);
+      }
+    } catch (e: unknown) {
+      error = e instanceof Error ? e.message : "Failed to create project";
+      resetGenerated();
+    } finally {
+      creating = false;
+      refresh();
+    }
+  }
+
+  async function acceptPlan() {
+    if (!createdId || !generated || generated.type !== "plan") return;
+
+    creating = true;
+    error = "";
+    stopTyping();
+
+    try {
+      await applyPlan(createdId, {
+        milestones: generated.milestones,
+        tasks: generated.tasks,
+      });
+
+      goto(`/projects/${createdId}`);
+    } catch (e: unknown) {
+      error = e instanceof Error ? e.message : "Failed to apply plan";
+    } finally {
+      creating = false;
+    }
+  }
+
+  async function discardPlan() {
+    if (createdId) {
+      try {
+        await deleteProject(createdId);
+      } catch {
+        //
+      }
+    }
+    resetGenerated();
+    refresh();
+  }
 </script>
 
-<main style="max-width: 1000px; margin: 0 auto; padding: 24px;">
-    <h1 style="margin: 0 0 8px;">Projects</h1>
-    <p style="margin: 0 0 16px; opacity: 0.8;">
-        Create a project, generate a plan with AI, then track tasks on a board.
-    </p>
+<div class="min-h-screen bg-slate-950 text-slate-100">
+  <div class="pointer-events-none fixed inset-0 overflow-hidden">
+    <div
+      class="absolute -top-40 left-1/2 h-[520px] w-[920px] -translate-x-1/2 rounded-full bg-indigo-500/20 blur-3xl"
+    ></div>
+    <div
+      class="absolute -bottom-40 left-1/3 h-[520px] w-[920px] -translate-x-1/2 rounded-full bg-fuchsia-500/10 blur-3xl"
+    ></div>
+  </div>
+
+  <main class="relative mx-auto w-full max-w-6xl px-6 pb-16 pt-6">
+    <Hero />
 
     <section
-        style="border: 1px solid #ddd; border-radius: 12px; padding: 16px; margin-bottom: 16px;"
+      id="create"
+      class="mx-auto mt-12 max-w-xl scroll-mt-24"
+      aria-label="Create a project"
     >
-        <h2 style="margin: 0 0 12px; font-size: 18px;">New project</h2>
-
-        {#if error}
-            <div style="margin-bottom: 12px; color: #b00020;">{error}</div>
-        {/if}
-
-        <form
-            on:submit|preventDefault={onCreate}
-            style="display: grid; gap: 10px;"
-        >
-            <label>
-                <div style="font-size: 12px; opacity: 0.8;">Title</div>
-                <input
-                    bind:value={title}
-                    placeholder="e.g., Learn Svelte and build a portfolio"
-                    style="width: 100%; padding: 10px;"
-                />
-            </label>
-
-            <label>
-                <div style="font-size: 12px; opacity: 0.8;">Goal</div>
-                <textarea
-                    bind:value={goal_text}
-                    rows="3"
-                    placeholder="Describe your high-level goal..."
-                    style="width: 100%; padding: 10px;"
-                ></textarea>
-            </label>
-
-            <div
-                style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;"
-            >
-                <label>
-                    <div style="font-size: 12px; opacity: 0.8;">
-                        Deadline (optional)
-                    </div>
-                    <input
-                        bind:value={deadline}
-                        placeholder="YYYY-MM-DD or 'no deadline'"
-                        style="width: 100%; padding: 10px;"
-                    />
-                </label>
-
-                <label>
-                    <div style="font-size: 12px; opacity: 0.8;">
-                        Hours/week (optional)
-                    </div>
-                    <input
-                        type="number"
-                        min="1"
-                        step="1"
-                        value={hours_per_week ?? ""}
-                        on:input={(e) => {
-                            const n = (e.currentTarget as HTMLInputElement)
-                                .valueAsNumber;
-                            hours_per_week = Number.isFinite(n) ? n : null;
-                        }}
-                        placeholder="e.g., 5"
-                        style="width: 100%; padding: 10px;"
-                    />
-                </label>
-            </div>
-
-            <button
-                type="submit"
-                disabled={creating || loading}
-                style="padding: 10px 14px; border-radius: 10px; border: 1px solid #333; cursor: pointer; opacity: {creating ||
-                loading
-                    ? 0.6
-                    : 1};"
-            >
-                {#if creating}
-                    Creating…
-                {:else}
-                    Create project
-                {/if}
-            </button>
-        </form>
+      <CreateProjectCard
+        bind:title
+        bind:goal_text
+        bind:deadline
+        bind:hours_per_week
+        {creating}
+        {error}
+        {onCreate}
+      />
     </section>
 
-    <section
-        style="border: 1px solid #ddd; border-radius: 12px; padding: 16px;"
-    >
-        <h2 style="margin: 0 0 12px; font-size: 18px;">Your projects</h2>
+    {#if createdId && generated?.type === "plan"}
+      <section
+        class="mx-auto mt-10 max-w-xl rounded-3xl bg-white/5 p-6 ring-1 ring-white/10"
+        aria-label="Generated tasks"
+      >
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <h3 class="text-lg font-extrabold">Generated todo list</h3>
+            <p class="mt-1 flex items-center gap-2 text-sm text-slate-300">
+              {#if typing}
+                <span
+                  class="inline-block h-2 w-2 animate-pulse rounded-full bg-white/70"
+                ></span>
+                Generating…
+              {:else}
+                Done. If you don’t like it, discard and generate again.
+              {/if}
+            </p>
+          </div>
 
-        {#if loading}
-            <div>Loading…</div>
-        {:else if projects.length === 0}
-            <div style="opacity: 0.8;">No projects yet.</div>
-        {:else}
-            <ul
-                style="list-style: none; padding: 0; margin: 0; display: grid; gap: 10px;"
+          <div
+            class="rounded-2xl bg-white/5 px-2 py-1 text-xs text-slate-200 ring-1 ring-white/10"
+          >
+            Project #{createdId}
+          </div>
+        </div>
+
+        <ol class="mt-4 space-y-2">
+          {#each typedTasks as task, i (i)}
+            <li
+              class="rounded-2xl bg-slate-950/40 px-4 py-3 ring-1 ring-white/10"
             >
-                {#each projects as p}
-                    <li
-                        style="border: 1px solid #eee; border-radius: 12px; padding: 12px;"
-                    >
-                        <div
-                            style="display: flex; justify-content: space-between; gap: 12px; align-items: center;"
-                        >
-                            <div style="min-width: 0;">
-                                <div style="font-weight: 600;">{p.title}</div>
-                                <div
-                                    style="opacity: 0.8; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"
-                                >
-                                    {p.goal_text}
-                                </div>
-                            </div>
-                            <button
-                                type="button"
-                                on:click={() => goto(`/projects/${p.id}`)}
-                                style="padding: 8px 12px; border-radius: 10px; border: 1px solid #333; cursor: pointer;"
-                            >
-                                Open
-                            </button>
-                        </div>
-                    </li>
-                {/each}
-            </ul>
-        {/if}
+              <div class="font-semibold">{task.title}</div>
+              {#if task.description}
+                <div class="mt-1 text-sm text-slate-300">
+                  {task.description}
+                </div>
+              {/if}
+              <div class="mt-2 text-xs text-slate-400">
+                {#if task.estimate}Est: {task.estimate}{/if}
+              </div>
+            </li>
+          {/each}
+        </ol>
+
+        <div class="mt-5 flex flex-wrap gap-3">
+          <button
+            class="rounded-2xl bg-white/10 px-4 py-2 text-sm font-semibold text-white ring-1 ring-white/10 hover:bg-white/15 disabled:opacity-50"
+            on:click={acceptPlan}
+            disabled={creating || typing}
+          >
+            Accept plan
+          </button>
+
+          <button
+            class="rounded-2xl bg-white/5 px-4 py-2 text-sm font-semibold text-slate-200 ring-1 ring-white/10 hover:bg-white/10 disabled:opacity-50"
+            on:click={discardPlan}
+            disabled={creating}
+          >
+            Discard
+          </button>
+        </div>
+      </section>
+    {/if}
+
+    <section class="mx-auto mt-12 max-w-6xl">
+      <ProjectsSection {projects} {loading} />
     </section>
-</main>
+  </main>
+</div>

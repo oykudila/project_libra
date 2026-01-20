@@ -33,7 +33,7 @@ export async function deleteProject(projectId: number): Promise<{ ok: boolean }>
 }
 
 // -----------------------------
-export type TaskStatus = "todo" | "doing" | "done";
+export type TaskStatus = "todo" | "in_progress" | "done";
 export type TaskSize = "S" | "M" | "L";
 
 
@@ -99,17 +99,6 @@ export type PlanGenerateInput = {
     constraints?: string | null;
 };
 
-export type PlanQuestion = {
-    id: string;
-    question: string;
-    field: string;
-};
-
-export type PlanQuestionsResponse = {
-    type: "questions";
-    questions: PlanQuestion[];
-};
-
 export type ProposeMilestone = {
     title: string;
     description?: string | null;
@@ -132,7 +121,7 @@ export type AIPlanResponse = {
     tasks: ProposeTask[];
 };
 
-export type GeneratePlanResponse = PlanQuestionsResponse | AIPlanResponse;
+export type GeneratePlanResponse = AIPlanResponse;
 
 export type PlanApplyInput = {
     milestones: ProposeMilestone[];
