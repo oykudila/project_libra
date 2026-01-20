@@ -16,7 +16,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
         try {
             const data = (await res.json()) as ApiErrorBody;
             if (data?.detail) detail = `: ${data.detail}`;
-        } catch(err) {
+        } catch (err) {
             // ignore JSON parse errors, raise HTTP errors 
         }
         throw new Error(`API error ${res.status}${detail}`);
@@ -26,7 +26,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
 
 // -----------------------------
-export type TaskStatus = "backlog" | "doing" | "done";
+export type TaskStatus = "todo" | "doing" | "done";
 export type TaskSize = "S" | "M" | "L";
 
 

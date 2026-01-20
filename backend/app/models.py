@@ -42,7 +42,7 @@ class Task(Base):
 
     title = Column(String, nullable=False)
     description = Column(Text, nullable=True)
-    status = Column(String, nullable=False, default="todo")  # todo, in progress, done
+    status = Column(String, nullable=False, default="todo")  # todo, doing, done
     due_date = Column(String, nullable=True)
     estimate = Column(String, nullable=True)  # S, M, L
     order_index = Column(Integer, nullable=False, default=0)

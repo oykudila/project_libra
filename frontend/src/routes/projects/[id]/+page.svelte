@@ -132,9 +132,8 @@
         }
     }
 
-    $: backlog =
-        project?.tasks?.filter((t: TaskResponse) => t.status === "backlog") ??
-        [];
+    $: todo =
+        project?.tasks?.filter((t: TaskResponse) => t.status === "todo") ?? [];
     $: doing =
         project?.tasks?.filter((t: TaskResponse) => t.status === "doing") ?? [];
     $: done =
@@ -254,6 +253,17 @@
                         {aiLoading ? "Generating…" : "Generate plan"}
                     </button>
 
+                    {#if aiLoading}
+                        <div
+                            class="mt-3 flex items-center gap-2 text-sm text-slate-600"
+                        >
+                            <span
+                                class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-700"
+                            ></span>
+                            Generating a plan…
+                        </div>
+                    {/if}
+
                     {#if aiError}
                         <div style="color: #b00020;">{aiError}</div>
                     {/if}
@@ -348,7 +358,7 @@
                 <div
                     style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px;"
                 >
-                    {#each [{ title: "Backlog", items: backlog }, { title: "Doing", items: doing }, { title: "Done", items: done }] as col}
+                    {#each [{ title: "Todo", items: todo }, { title: "Doing", items: doing }, { title: "Done", items: done }] as col}
                         <div
                             style="border: 1px solid #eee; border-radius: 12px; padding: 12px;"
                         >
@@ -383,16 +393,16 @@
                                             <div
                                                 style="display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap;"
                                             >
-                                                {#if task.status !== "backlog"}
+                                                {#if task.status !== "todo"}
                                                     <button
                                                         on:click={() =>
                                                             setStatus(
                                                                 task,
-                                                                "backlog",
+                                                                "todo",
                                                             )}
                                                         style="padding: 6px 10px; border-radius: 10px; border: 1px solid #333; cursor: pointer;"
                                                     >
-                                                        Backlog
+                                                        Todo
                                                     </button>
                                                 {/if}
                                                 {#if task.status !== "doing"}
@@ -426,11 +436,6 @@
                             {/if}
                         </div>
                     {/each}
-                </div>
-
-                <div style="opacity: 0.75; font-size: 12px; margin-top: 12px;">
-                    Tip: This board is persisted in the database—refreshing
-                    won’t erase it anymore.
                 </div>
             </section>
         </div>

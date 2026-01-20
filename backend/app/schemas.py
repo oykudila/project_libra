@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 from typing import Optional, List, Literal
 
-TaskStatus = Literal["backlog", "doing", "done"]
+TaskStatus = Literal["todo", "doing", "done"]
 TaskSize = Literal["S", "M", "L"]
 
 
@@ -85,7 +85,7 @@ class ProposeTask(BaseModel):
     title: str
     description: Optional[str] = None
     milestone_index: Optional[int] = None
-    status: TaskStatus = "backlog"
+    status: TaskStatus = "todo"
     due_date: Optional[str] = None
     estimate: Optional[TaskSize] = None
     order_index: int = 0
