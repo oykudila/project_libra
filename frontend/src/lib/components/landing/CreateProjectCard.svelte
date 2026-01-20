@@ -112,10 +112,14 @@
     >
       {#if creating}
         <span
-          class="mr-2 inline-block h-4 w-4 animate-spin rounded-full
-                 border-2 border-slate-200/30 border-t-slate-200"
+          class="mr-3 inline-block h-6 w-6 animate-spin rounded-full
+         border-[4px] border-white/10
+         border-t-white border-r-white/70
+         shadow-[0_0_10px_rgba(255,255,255,0.5)]
+         will-change-transform"
+          aria-hidden="true"
         ></span>
-        Generating your plan...
+        Generating your plan…
       {:else}
         Generate project plan
       {/if}

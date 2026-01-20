@@ -6,6 +6,14 @@
   export let projects: ProjectResponse[] = [];
   export let loading = false;
   export let highlight = false;
+  export let onDelete: (id: number) => void;
+
+  function handleDelete(e: MouseEvent, id: number) {
+    // prevent the outer "open project" click
+    e.preventDefault();
+    e.stopPropagation();
+    onDelete?.(id);
+  }
 </script>
 
 <section
@@ -15,7 +23,7 @@
 >
   <div class="flex items-end justify-between gap-4">
     <div>
-      <div class="flex items-center gap-3">
+      <div class="flex items-center gap-2">
         <div class="flex items-center gap-2">
           <h2
             class="text-xl font-extrabold tracking-tight transition
@@ -80,28 +88,30 @@
                     {p.goal_text}
                   </div>
                 </div>
-                <div
-                  class="rounded-2xl bg-white/5 px-2 py-1 text-xs text-slate-200 ring-1 ring-white/10"
-                >
-                  #{p.id}
-                </div>
+                <div class="flex items-start gap-2"></div>
               </div>
 
-              <div class="mt-4 flex flex-wrap gap-2 text-xs text-slate-300">
-                {#if p.deadline}
-                  <span
-                    class="rounded-full bg-white/5 px-2 py-1 ring-1 ring-white/10"
-                    >Deadline: {p.deadline}</span
-                  >
-                {/if}
-                {#if typeof p.hours_per_week === "number"}
-                  <span
-                    class="rounded-full bg-white/5 px-2 py-1 ring-1 ring-white/10"
-                    >{p.hours_per_week} hrs/wk</span
-                  >
-                {/if}
+              <div class="mt-4 flex items-end gap-3">
+                <div class="flex flex-wrap gap-2 text-xs text-slate-300">
+                  {#if p.deadline}
+                    <span
+                      class="rounded-full bg-white/5 px-2 py-1 ring-1 ring-white/10"
+                    >
+                      Deadline: {p.deadline}
+                    </span>
+                  {/if}
+
+                  {#if typeof p.hours_per_week === "number"}
+                    <span
+                      class="rounded-full bg-white/5 px-2 py-1 ring-1 ring-white/10"
+                    >
+                      {p.hours_per_week} hrs/wk
+                    </span>
+                  {/if}
+                </div>
+
                 <span
-                  class="rounded-full bg-indigo-400/10 px-2 py-1 text-indigo-200 ring-1 ring-indigo-400/20"
+                  class="ml-auto shrink-0 rounded-full bg-indigo-400/10 px-2 py-1 text-xs font-semibold text-indigo-200 ring-1 ring-indigo-400/20"
                 >
                   Open →
                 </span>

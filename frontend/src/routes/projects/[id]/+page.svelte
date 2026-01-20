@@ -5,27 +5,22 @@
 
   import {
     getProject,
-    applyPlan,
+    updateTask,
+    deleteProject,
     type ProjectDetailResponse,
-    type GeneratePlanResponse,
-    type ProposeTask,
-    type ProposeMilestone,
     type TaskStatus,
   } from "$lib/api";
 
-  import ProjectPreviewBoard from "$lib/components/projects/ProjectPreviewBoard.svelte";
+  import ProjectBoard from "$lib/components/projects/ProjectBoard.svelte";
 
   let projectId = 0;
   let project: ProjectDetailResponse | null = null;
 
-  let previewPlan: {
-    milestones: ProposeMilestone[];
-    tasks: ProposeTask[];
-  } | null = null;
-
   let loading = false;
   let error = "";
-  let applying = false;
+  let saving = false;
+
+  let snapshot = new Map<number, { status: TaskStatus; order_index: number }>();
 
   function getId() {
     const n = Number(page.params.id);
@@ -37,72 +32,88 @@
     error = "";
     try {
       project = await getProject(projectId);
+      snapshot = new Map(
+        project.tasks.map((t) => [
+          t.id,
+          { status: t.status, order_index: t.order_index },
+        ]),
+      );
     } catch (e: unknown) {
       error = e instanceof Error ? e.message : "Failed to load project";
       project = null;
+      snapshot = new Map();
     } finally {
       loading = false;
-    }
-  }
-
-  function loadPreviewIfAny() {
-    const isPreview = page.url.searchParams.get("preview") === "1";
-    if (!isPreview) return;
-
-    const raw = sessionStorage.getItem(`plan_preview_${projectId}`);
-    if (!raw) return;
-
-    try {
-      const parsed = JSON.parse(raw) as GeneratePlanResponse;
-      if (parsed.type === "plan") {
-        previewPlan = { milestones: parsed.milestones, tasks: parsed.tasks };
-      }
-    } catch {
-      // ignore
     }
   }
 
   onMount(async () => {
     projectId = getId();
     await refresh();
-    loadPreviewIfAny();
   });
 
-  async function applyPreview() {
-    if (!previewPlan) return;
-    applying = true;
+  async function onCommit(
+    desired: Array<{ id: number; status: TaskStatus; order_index: number }>,
+  ) {
+    if (!project) return;
+
+    saving = true;
     error = "";
+
+    const prev = new Map(
+      project.tasks.map((t) => [
+        t.id,
+        { status: t.status, order_index: t.order_index },
+      ]),
+    );
+
+    const toPatch = desired.filter((d) => {
+      const p = prev.get(d.id);
+      return !p || p.status !== d.status || p.order_index !== d.order_index;
+    });
+
+    const desiredById = new Map(desired.map((d) => [d.id, d]));
+    project = {
+      ...project,
+      tasks: project.tasks.map((t) => {
+        const d = desiredById.get(t.id);
+        return d ? { ...t, status: d.status, order_index: d.order_index } : t;
+      }),
+    };
+
     try {
-      const updated = await applyPlan(projectId, {
-        milestones: previewPlan.milestones,
-        tasks: previewPlan.tasks,
-      });
-
-      project = updated;
-      sessionStorage.removeItem(`plan_preview_${projectId}`);
-      previewPlan = null;
-
-      goto(`/projects/${projectId}`, { replaceState: true });
+      if (toPatch.length > 0) {
+        await Promise.all(
+          toPatch.map((d) =>
+            updateTask(d.id, { status: d.status, order_index: d.order_index }),
+          ),
+        );
+      }
     } catch (e: unknown) {
-      error = e instanceof Error ? e.message : "Failed to apply plan";
+      error = e instanceof Error ? e.message : "Failed to save drag & drop";
+      await refresh();
     } finally {
-      applying = false;
+      saving = false;
     }
   }
 
-  function discardPreview() {
-    sessionStorage.removeItem(`plan_preview_${projectId}`);
-    previewPlan = null;
-    goto(`/projects/${projectId}`, { replaceState: true });
+  async function handleDeleteProject() {
+    if (!project) return;
+    await deleteProject(project.id);
+    goto("/");
   }
 </script>
 
-<ProjectPreviewBoard
-  {project}
-  {previewPlan}
-  {loading}
-  {error}
-  {applying}
-  onApplyPreview={applyPreview}
-  onDiscardPreview={discardPreview}
-/>
+<div class="min-h-screen bg-slate-950 text-slate-100">
+  <main class="mx-auto w-full max-w-6xl px-6 pb-16 pt-6">
+    <ProjectBoard
+      {project}
+      {loading}
+      {error}
+      onBack={() => goto("/")}
+      onRefresh={refresh}
+      {onCommit}
+      onDelete={handleDeleteProject}
+    />
+  </main>
+</div>
