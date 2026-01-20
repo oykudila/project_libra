@@ -13,7 +13,7 @@
     import { goto } from "$app/navigation";
 
     let projectId = 0;
-    $: projectId = Number($page.params.id);
+    $: projectId = Number(page.params.id ?? 0);
 
     let project: ProjectDetailResponse | null = null;
     let loading = true;
@@ -27,11 +27,7 @@
     let hours_per_week: number | null = null;
     let experience_level: "beginner" | "intermediate" | "advanced" | "" = "";
     let constraints = "";
-    let detail_level: "simple" | "detailed" | "" = "detailed";
-
-    function getErrorMessage(e: unknown, fallback: string) {
-        return e instanceof Error ? e.message : fallback;
-    }
+    let detail_level: "simple" | "detailed" = "detailed";
 
     async function load() {
         if (!Number.isFinite(projectId) || projectId <= 0) return;
@@ -92,7 +88,8 @@
                 detail_level,
             });
         } catch (e: unknown) {
-            aiError = getErrorMessage(e, "Failed to generate plan");
+            aiError = error =
+                e instanceof Error ? e.message : "Failed to generate plan";
         } finally {
             aiLoading = false;
         }
@@ -111,7 +108,8 @@
             });
             aiResult = null;
         } catch (e: unknown) {
-            aiError = getErrorMessage(e, "Failed to apply plan");
+            aiError = error =
+                e instanceof Error ? e.message : "Failed to apply plan";
         } finally {
             aiLoading = false;
         }
@@ -141,8 +139,6 @@
         project?.tasks?.filter((t: TaskResponse) => t.status === "doing") ?? [];
     $: done =
         project?.tasks?.filter((t: TaskResponse) => t.status === "done") ?? [];
-
-    load();
 </script>
 
 <main style="max-width: 1200px; margin: 0 auto; padding: 24px;">
@@ -196,7 +192,15 @@
                             Hours/week
                         </div>
                         <input
-                            bind:value={hours_per_week}
+                            type="number"
+                            min="1"
+                            step="1"
+                            value={hours_per_week ?? ""}
+                            on:input={(e) => {
+                                const n = (e.currentTarget as HTMLInputElement)
+                                    .valueAsNumber;
+                                hours_per_week = Number.isFinite(n) ? n : null;
+                            }}
                             placeholder="e.g., 5"
                             style="width: 100%; padding: 10px;"
                         />

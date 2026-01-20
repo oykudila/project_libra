@@ -36,14 +36,21 @@
         const g = goal_text.trim();
         const d = deadline.trim() ? deadline.trim() : null;
 
-        const hpw = parseOptionalInt(hours_per_week);
-        if (hours_per_week.trim() && hpw === null) {
-            error = "Hours per week must be a non-negative whole number.";
+        if (!t || !g) {
+            error = "Title and goal are required.";
             return;
         }
 
-        if (!t || !g) {
-            error = "Title and goal are required.";
+        const hpw =
+            hours_per_week === null
+                ? null
+                : Number.isFinite(hours_per_week) &&
+                    Number.isInteger(hours_per_week) &&
+                    hours_per_week >= 0
+                  ? hours_per_week
+                  : null;
+        if (hours_per_week !== null && hpw === null) {
+            error = "Hours per week must be a non-negative whole number.";
             return;
         }
 
@@ -59,7 +66,7 @@
             title = "";
             goal_text = "";
             deadline = "";
-            hours_per_week = "";
+            hours_per_week = null;
 
             await goto(`/projects/${p.id}`);
         } catch (e: unknown) {
@@ -128,9 +135,15 @@
                         Hours/week (optional)
                     </div>
                     <input
-                        bind:value={hours_per_week}
-                        inputmode="numeric"
-                        pattern="[0-9]*"
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={hours_per_week ?? ""}
+                        on:input={(e) => {
+                            const n = (e.currentTarget as HTMLInputElement)
+                                .valueAsNumber;
+                            hours_per_week = Number.isFinite(n) ? n : null;
+                        }}
                         placeholder="e.g., 5"
                         style="width: 100%; padding: 10px;"
                     />

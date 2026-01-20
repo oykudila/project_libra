@@ -26,7 +26,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
 
 // -----------------------------
-export type TaskStatus = "backlog" | "in progress" | "done";
+export type TaskStatus = "backlog" | "doing" | "done";
 export type TaskSize = "S" | "M" | "L";
 
 
