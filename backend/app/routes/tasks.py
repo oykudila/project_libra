@@ -20,20 +20,15 @@ def create_task(payload: TaskCreate, db: Session = Depends(get_db)):
     if not title:
         raise HTTPException(status_code=400, detail="Title is required")
 
-    # If order_index not provided, append to end of that status column
-    if payload.order_index is None:
-        max_row = (
-            db.query(models.Task.order_index)
-            .filter(
-                models.Task.project_id == payload.project_id,
-                models.Task.status == payload.status,
-            )
-            .order_by(models.Task.order_index.desc())
-            .first()
-        )
-        next_idx = (max_row[0] + 1) if max_row and max_row[0] is not None else 0
-    else:
-        next_idx = payload.order_index
+    insert_at = 0 if payload.order_index is None else payload.order_index
+    if insert_at < 0:
+        insert_at = 0
+
+    db.query(models.Task).filter(
+        models.Task.project_id == payload.project_id,
+        models.Task.status == payload.status,
+        models.Task.order_index >= insert_at,
+    ).update({models.Task.order_index: models.Task.order_index + 1})
 
     task = models.Task(
         project_id=payload.project_id,
@@ -43,7 +38,7 @@ def create_task(payload: TaskCreate, db: Session = Depends(get_db)):
         status=payload.status,
         due_date=payload.due_date,
         estimate=payload.estimate,
-        order_index=next_idx,
+        order_index=insert_at,
     )
 
     db.add(task)

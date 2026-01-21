@@ -16,6 +16,8 @@
   export let goal_text = "";
   export let deadline = "";
   export let hours_per_week: number | null = null;
+  export let experience_level: "beginner" | "intermediate" | "advanced" =
+    "beginner";
 
   export let creating = false;
   export let error = "";
@@ -25,6 +27,7 @@
   const idGoal = "lp_goal";
   const idDeadline = "lp_deadline";
   const idHpw = "lp_hpw";
+  const idExp = "lp_exp";
 
   onMount(() => {
     requestAnimationFrame(() => {
@@ -49,6 +52,7 @@
         class="bg-slate-950/40 text-slate-100 ring-1 ring-white/10 placeholder:text-slate-500"
         placeholder="e.g., Build a portfolio website"
         bind:value={title}
+        disabled={creating}
       />
     </div>
 
@@ -59,6 +63,7 @@
         class="bg-slate-950/40 text-slate-100 ring-1 ring-white/10 placeholder:text-slate-500"
         placeholder="e.g., I want to create a personal website to showcase my projects and skills."
         bind:value={goal_text}
+        disabled={creating}
       />
     </div>
 
@@ -72,6 +77,7 @@
           class="bg-slate-950/40 text-slate-100 ring-1 ring-white/10 placeholder:text-slate-500"
           placeholder="e.g., 2 weeks"
           bind:value={deadline}
+          disabled={creating}
         />
       </div>
 
@@ -87,11 +93,28 @@
           class="bg-slate-950/40 text-slate-100 ring-1 ring-white/10 placeholder:text-slate-500"
           value={hours_per_week ?? ""}
           placeholder="e.g., 6"
+          disabled={creating}
           oninput={(e: Event) => {
             const n = (e.currentTarget as HTMLInputElement).valueAsNumber;
             hours_per_week = Number.isFinite(n) ? n : null;
           }}
         />
+      </div>
+    </div>
+    <div class="grid gap-2">
+      <Label for={idExp} class="text-slate-200">Experience level</Label>
+      <select
+        id={idExp}
+        class="w-full rounded-xl bg-slate-950/40 px-3 py-2 text-sm text-slate-100 ring-1 ring-white/10"
+        bind:value={experience_level}
+        disabled={creating}
+      >
+        <option value="beginner">Beginner</option>
+        <option value="intermediate">Intermediate</option>
+        <option value="advanced">Advanced</option>
+      </select>
+      <div class="text-xs text-slate-400">
+        Affects how detailed and challenging the plan is.
       </div>
     </div>
 

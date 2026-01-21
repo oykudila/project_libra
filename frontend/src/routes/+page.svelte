@@ -20,11 +20,14 @@
     type ProposeTask,
   } from "$lib/api";
 
+  type ExperienceLevel = "beginner" | "intermediate" | "advanced";
+
   type PendingDraft = {
     title: string;
     goal_text: string;
     deadline: string | null;
     hours_per_week: number | null;
+    experience_level: ExperienceLevel;
   };
 
   let pending: PendingDraft | null = null;
@@ -40,6 +43,7 @@
   let goal_text = "";
   let deadline = "";
   let hours_per_week: number | null = null;
+  let experience_level: ExperienceLevel = "beginner";
 
   let generated: GeneratePlanResponse | null = null;
   let typedTasks: ProposeTask[] = [];
@@ -85,7 +89,7 @@
         return;
       }
 
-      const delay = 200 + Math.random() * 300;
+      const delay = 150 + Math.random() * 500;
       typingTimer = setTimeout(tick, delay);
     }
 
@@ -122,15 +126,20 @@
     creating = true;
     resetGenerated();
 
-    // store the draft details so the UI persists
-    pending = { title: t, goal_text: g, deadline: d, hours_per_week: hpw };
+    pending = {
+      title: t,
+      goal_text: g,
+      deadline: d,
+      hours_per_week: hpw,
+      experience_level,
+    };
 
     try {
       const plan = await generatePlanDraft({
         goal_text: g,
         deadline: d,
         hours_per_week: hpw,
-        experience_level: "beginner",
+        experience_level,
         detail_level: "simple",
       });
 
@@ -196,7 +205,7 @@
         goal_text: pending.goal_text,
         deadline: pending.deadline,
         hours_per_week: pending.hours_per_week,
-        experience_level: "beginner",
+        experience_level: pending.experience_level,
         detail_level: "simple",
         constraints: null,
         current_plan: generated,
@@ -253,6 +262,7 @@
         bind:goal_text
         bind:deadline
         bind:hours_per_week
+        bind:experience_level
         {creating}
         {error}
         {onCreate}
@@ -268,7 +278,12 @@
           <div
             class="rounded-2xl bg-white/5 px-2 py-1 text-xs text-slate-200 ring-1 ring-white/10"
           >
-            Draft plan (not saved yet)
+            This is the draft plan, you can also adjust your tasks later.
+          </div>
+          <div
+            class="rounded-2xl bg-white/5 px-2 py-1 text-xs text-slate-200 ring-1 ring-white/10"
+          >
+            Experience: {pending.experience_level}
           </div>
         </div>
 

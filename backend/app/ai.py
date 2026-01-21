@@ -87,13 +87,21 @@ def generate_plan(payload: PlanGenerateInput) -> PlanResponse:
 
     system = (
         "You are a planning assistant. Convert the user's goal into an actionable plan.\n"
-        "Return milestones and tasks that are realistic for the provided time budget and deadline.\n"
-        "Rules:\n"
-        "- milestone_index must refer to the index of the milestones list (0..n-1)\n"
-        "- order_index starts at 0 within milestones and within each milestone's tasks\n"
-        "- estimates must be one of: S, M, L\n"
-        "- statuses must be one of: todo, doing, done (use todo by default)\n"
-        "- Keep tasks specific, testable, and phrased as actions.\n"
+        "Return a SHORT plan in PlanResponse JSON only.\n"
+        "Hard rules:\n"
+        "- Exactly 3 milestones.\n"
+        "- 8–12 tasks total.\n"
+        "- Each task is one action.\n"
+        "- milestone_index must be 0,1,2.\n"
+        "- order_index starts at 0 within each milestone.\n"
+        "- status must be todo, in_progress, or done (default todo).\n"
+        "- estimate must be S, M, or L (omit if unsure).\n"
+        "- No extra fields. No commentary.\n"
+        "\n"
+        "Adapt to EXPERIENCE:\n"
+        "- beginner: assume no prior knowledge, include setup + fundamentals, smaller steps, more guidance.\n"
+        "- intermediate: assume basics are known, fewer setup tasks, focus on practice/projects, moderate steps.\n"
+        "- advanced: assume strong fundamentals, skip basics, focus on optimization, depth, and real deliverables.\n"
     )
 
     deadline = _clean_opt(payload.deadline)
@@ -192,7 +200,13 @@ def revise_plan(payload: PlanReviseInput) -> PlanResponse:
         "Rules: exactly 3 milestones; 8-12 tasks; each task is one action; "
         "milestone_index in 0,1,2; order_index starts at 0 per milestone; "
         "status in todo|in_progress|done; estimate S|M|L or omit; "
-        "no extra fields; no commentary."
+        "no extra fields; no commentary.\n"
+        "\n"
+        "Adapt to EXPERIENCE:\n"
+        "- beginner: add setup/fundamentals, smaller steps, more guidance.\n"
+        "- intermediate: skip trivial basics, focus on practice/projects.\n"
+        "- advanced: skip basics, focus on depth, optimization, and strong deliverables.\n"
+        "Preserve what still fits; apply the user's adjustment."
     )
 
     deadline = _clean_opt(payload.deadline)

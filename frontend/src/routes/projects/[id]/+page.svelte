@@ -106,7 +106,16 @@
     if (!project) return;
 
     const tempId = -Math.floor(Math.random() * 1_000_000_000);
-    const order_index = project.tasks.filter((t) => t.status === status).length;
+
+    const prev = project;
+    project = {
+      ...project,
+      tasks: project.tasks.map((t) =>
+        t.status === status
+          ? { ...t, order_index: (t.order_index ?? 0) + 1 }
+          : t,
+      ),
+    };
 
     const tempTask = {
       id: tempId,
@@ -115,11 +124,10 @@
       status,
       due_date: null,
       estimate: null,
-      order_index,
+      order_index: 0,
       milestone_id: null,
     };
 
-    const prev = project;
     project = { ...project, tasks: [...project.tasks, tempTask] };
 
     try {
@@ -128,7 +136,7 @@
         title: payload.title,
         description: payload.description ?? null,
         status,
-        order_index,
+        order_index: 0,
       });
 
       project = {
