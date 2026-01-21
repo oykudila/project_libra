@@ -13,6 +13,16 @@
   export let onBack: () => void;
   export let onRefresh: () => void | Promise<void>;
   export let onDelete: () => void | Promise<void>;
+  export let onDeleteTask: (taskId: number) => void | Promise<void>;
+  export let onCreateTask: (
+    status: TaskStatus,
+    payload: { title: string; description?: string },
+  ) => void | Promise<void>;
+
+  export let onEditTask: (
+    taskId: number,
+    patch: { title?: string; description?: string },
+  ) => void | Promise<void>;
 
   // Parent persistence hook: called on finalize with flattened tasks
   export let onCommit: (
@@ -25,10 +35,7 @@
     done: [],
   };
 
-  let lastProjectId: number | null = null;
-  $: if (project && project.id !== lastProjectId) {
-    lastProjectId = project.id;
-
+  $: if (project) {
     const sorted = project.tasks
       .slice()
       .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
@@ -38,6 +45,8 @@
       in_progress: sorted.filter((t) => t.status === "in_progress"),
       done: sorted.filter((t) => t.status === "done"),
     };
+  } else {
+    cols = { todo: [], in_progress: [], done: [] };
   }
 
   function normalizeAndFlatten(): Array<{
@@ -55,7 +64,7 @@
     return out;
   }
 
-  async function handleDelete() {
+  async function handleDeleteProject() {
     if (!project) return;
 
     const ok = confirm(`Delete "${project.title}"? This cannot be undone.`);
@@ -124,7 +133,7 @@
       <button
         type="button"
         class="rounded-2xl bg-red-500/15 px-4 py-2 text-sm font-semibold text-red-200 ring-1 ring-red-500/30 hover:bg-red-500/25 disabled:opacity-50"
-        on:click={handleDelete}
+        on:click={handleDeleteProject}
         disabled={loading || !project}
         title="Delete this project"
       >
@@ -165,18 +174,27 @@
         status="todo"
         items={cols.todo}
         onItemsChange={handleItemsChange}
+        {onDeleteTask}
+        {onEditTask}
+        {onCreateTask}
       />
       <KanbanColumn
         title="In progress"
         status="in_progress"
         items={cols.in_progress}
         onItemsChange={handleItemsChange}
+        {onDeleteTask}
+        {onEditTask}
+        {onCreateTask}
       />
       <KanbanColumn
         title="Done"
         status="done"
         items={cols.done}
         onItemsChange={handleItemsChange}
+        {onDeleteTask}
+        {onEditTask}
+        {onCreateTask}
       />
     </div>
   {/if}

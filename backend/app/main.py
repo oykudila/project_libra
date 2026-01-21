@@ -31,6 +31,7 @@ def create_app() -> FastAPI:
         return {"status": "ok"}
 
     app.include_router(projects.router)
+    app.include_router(plans.draft_router)
     app.include_router(plans.router)
     app.include_router(tasks.router)
 

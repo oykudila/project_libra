@@ -8,10 +8,12 @@ from ..schemas import (
     PlanApplyInput,
     ProjectDetailResponse,
     PlanResponse,
+    PlanReviseInput,
 )
-from ..ai import generate_plan
+from ..ai import generate_plan, revise_plan
 
 router = APIRouter(prefix="/projects/{project_id}/plan", tags=["plans"])
+draft_router = APIRouter(prefix="/plan", tags=["plan-draft"])
 
 
 @router.post("/generate", response_model=PlanResponse)
@@ -38,6 +40,45 @@ def generate(
         return generate_plan(merge_defaults)
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"AI planning failed: {e}")
+
+
+@draft_router.post("/generate", response_model=PlanResponse)
+def draft_generate(payload: PlanGenerateInput):
+    try:
+        return generate_plan(payload)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"AI planning failed: {e}")
+
+
+@draft_router.post("/revise", response_model=PlanResponse)
+def draft_revise(payload: PlanReviseInput):
+    try:
+        return revise_plan(payload)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"AI revise failed: {e}")
+
+
+@router.post("/revise", response_model=PlanResponse)
+def revise(project_id: int, payload: PlanReviseInput, db: Session = Depends(get_db)):
+    project = db.query(models.Project).filter(models.Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    merge_defaults = payload.model_copy(
+        update={
+            "goal_text": payload.goal_text or project.goal_text,
+            "deadline": payload.deadline or project.deadline,
+            "hours_per_week": (
+                payload.hours_per_week
+                if payload.hours_per_week is not None
+                else project.hours_per_week
+            ),
+        }
+    )
+    try:
+        return revise_plan(merge_defaults)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"AI revise failed: {e}")
 
 
 @router.post("/apply", response_model=ProjectDetailResponse)

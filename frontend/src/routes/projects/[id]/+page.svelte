@@ -6,7 +6,9 @@
   import {
     getProject,
     updateTask,
+    deleteTask,
     deleteProject,
+    createTask,
     type ProjectDetailResponse,
     type TaskStatus,
   } from "$lib/api";
@@ -97,6 +99,88 @@
     }
   }
 
+  async function onCreateTask(
+    status: TaskStatus,
+    payload: { title: string; description?: string },
+  ) {
+    if (!project) return;
+
+    const tempId = -Math.floor(Math.random() * 1_000_000_000);
+    const order_index = project.tasks.filter((t) => t.status === status).length;
+
+    const tempTask = {
+      id: tempId,
+      title: payload.title,
+      description: payload.description ?? null,
+      status,
+      due_date: null,
+      estimate: null,
+      order_index,
+      milestone_id: null,
+    };
+
+    const prev = project;
+    project = { ...project, tasks: [...project.tasks, tempTask] };
+
+    try {
+      const created = await createTask({
+        project_id: projectId,
+        title: payload.title,
+        description: payload.description ?? null,
+        status,
+        order_index,
+      });
+
+      project = {
+        ...project,
+        tasks: project.tasks.map((t) => (t.id === tempId ? created : t)),
+      };
+    } catch (e: unknown) {
+      error = e instanceof Error ? e.message : "Failed to create task";
+      project = prev;
+    }
+  }
+
+  async function onDeleteTask(taskId: number) {
+    if (!project) return;
+    if (!confirm("Delete this task?")) return;
+
+    const prev = project;
+    project = {
+      ...project,
+      tasks: project.tasks.filter((t) => t.id !== taskId),
+    };
+
+    try {
+      await deleteTask(taskId);
+    } catch (e: unknown) {
+      error = e instanceof Error ? e.message : "Failed to delete task";
+      project = prev; // rollback
+    }
+  }
+
+  async function onEditTask(
+    taskId: number,
+    patch: { title?: string; description?: string },
+  ) {
+    if (!project) return;
+
+    const prev = project;
+    project = {
+      ...project,
+      tasks: project.tasks.map((t) =>
+        t.id === taskId ? { ...t, ...patch } : t,
+      ),
+    };
+
+    try {
+      await updateTask(taskId, patch);
+    } catch (e: unknown) {
+      error = e instanceof Error ? e.message : "Failed to update task";
+      project = prev; // rollback
+    }
+  }
+
   async function handleDeleteProject() {
     if (!project) return;
     await deleteProject(project.id);
@@ -114,6 +198,9 @@
       onRefresh={refresh}
       {onCommit}
       onDelete={handleDeleteProject}
+      {onDeleteTask}
+      {onEditTask}
+      {onCreateTask}
     />
   </main>
 </div>

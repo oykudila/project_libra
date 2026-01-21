@@ -1,8 +1,19 @@
 from pydantic import BaseModel
-from typing import Optional, List, Literal
+from typing import Optional, List, Literal, Any
 
 TaskStatus = Literal["todo", "in_progress", "done"]
 TaskSize = Literal["S", "M", "L"]
+
+
+class PlanReviseInput(BaseModel):
+    goal_text: str
+    deadline: Optional[str] = None
+    hours_per_week: Optional[int] = None
+    experience_level: Optional[Literal["beginner", "intermediate", "advanced"]] = None
+    detail_level: Optional[Literal["simple", "detailed"]] = "simple"
+    constraints: Optional[str] = None
+    current_plan: Any
+    adjustment: str
 
 
 class ProjectCreate(BaseModel):
@@ -89,6 +100,17 @@ class TaskUpdate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
     status: Optional[TaskStatus] = None
+    due_date: Optional[str] = None
+    estimate: Optional[TaskSize] = None
+    order_index: Optional[int] = None
+    milestone_id: Optional[int] = None
+
+
+class TaskCreate(BaseModel):
+    project_id: int
+    title: str
+    description: Optional[str] = None
+    status: TaskStatus = "todo"
     due_date: Optional[str] = None
     estimate: Optional[TaskSize] = None
     order_index: Optional[int] = None
