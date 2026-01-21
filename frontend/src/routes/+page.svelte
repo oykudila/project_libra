@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onDestroy, onMount } from "svelte";
   import { goto } from "$app/navigation";
 
   import {
@@ -20,6 +20,7 @@
     type ProposeTask,
   } from "$lib/api";
 
+  // --- Types ---
   type ExperienceLevel = "beginner" | "intermediate" | "advanced";
 
   type PendingDraft = {
@@ -30,14 +31,8 @@
     experience_level: ExperienceLevel;
   };
 
-  let pending: PendingDraft | null = null;
   let projects: ProjectResponse[] = [];
   let loading = false;
-  let creating = false;
-  let error = "";
-
-  let adjustment = "";
-  let revising = false;
 
   let title = "";
   let goal_text = "";
@@ -45,17 +40,32 @@
   let hours_per_week: number | null = null;
   let experience_level: ExperienceLevel = "beginner";
 
+  let pending: PendingDraft | null = null;
   let generated: GeneratePlanResponse | null = null;
+
+  let creating = false;
+  let error = "";
+
+  let adjustment = "";
+  let revising = false;
+
+  // AI typing animation
   let typedTasks: ProposeTask[] = [];
   let typing = false;
   let typingTimer: ReturnType<typeof setTimeout> | null = null;
 
+  let refreshCtrl: AbortController | null = null;
+
   async function refresh() {
+    refreshCtrl?.abort();
+    refreshCtrl = new AbortController();
+
     loading = true;
     error = "";
     try {
-      projects = await listProjects();
+      projects = await listProjects(refreshCtrl.signal);
     } catch (e: unknown) {
+      if (e instanceof DOMException && e.name === "AbortError") return;
       error = e instanceof Error ? e.message : "Failed to load projects";
     } finally {
       loading = false;
@@ -64,8 +74,13 @@
 
   onMount(refresh);
 
+  onDestroy(() => {
+    refreshCtrl?.abort();
+    if (typingTimer) clearTimeout(typingTimer);
+  });
+
   function stopTyping() {
-    if (typingTimer !== null) {
+    if (typingTimer) {
       clearTimeout(typingTimer);
       typingTimer = null;
     }
@@ -78,9 +93,12 @@
     typing = true;
 
     let i = 0;
+    const acc: ProposeTask[] = [];
 
-    function tick() {
-      typedTasks = [...typedTasks, tasks[i]];
+    const tick = () => {
+      acc.push(tasks[i]);
+
+      typedTasks = acc.slice();
       i += 1;
 
       if (i >= tasks.length) {
@@ -89,9 +107,8 @@
         return;
       }
 
-      const delay = 80 + Math.random() * 150;
-      typingTimer = setTimeout(tick, delay);
-    }
+      typingTimer = setTimeout(tick, 10);
+    };
 
     tick();
   }
@@ -109,6 +126,7 @@
     const t = title.trim();
     const g = goal_text.trim();
     const d = deadline.trim() ? deadline.trim() : null;
+
     const hpw =
       hours_per_week === null
         ? null
@@ -144,7 +162,6 @@
       });
 
       generated = plan;
-
       if (plan.type === "plan") startTypingTasks(plan.tasks);
     } catch (e: unknown) {
       error = e instanceof Error ? e.message : "Failed to generate plan";
@@ -183,12 +200,6 @@
     }
   }
 
-  function typeFromGenerated(plan: GeneratePlanResponse) {
-    stopTyping();
-    typedTasks = [];
-    if (plan.type === "plan") startTypingTasks(plan.tasks);
-  }
-
   async function onAdjustPlan() {
     if (!pending || !generated || generated.type !== "plan") return;
 
@@ -216,14 +227,13 @@
       if (revised.type === "plan") startTypingTasks(revised.tasks);
     } catch (e: unknown) {
       error = e instanceof Error ? e.message : "Failed to adjust plan";
-      // re-type existing plan so user isn't stuck
       if (generated.type === "plan") startTypingTasks(generated.tasks);
     } finally {
       revising = false;
     }
   }
 
-  async function discardPlan() {
+  function discardPlan() {
     resetGenerated();
   }
 
@@ -266,6 +276,25 @@
         {error}
         {onCreate}
       />
+
+      {#if creating && !generated}
+        <section
+          class="mx-auto mt-10 max-w-xl rounded-3xl bg-white/5 p-6 ring-1 ring-white/10"
+        >
+          <div class="text-sm font-semibold">Drafting your plan…</div>
+          <div class="mt-2 space-y-2">
+            <div
+              class="h-12 animate-pulse rounded-2xl bg-slate-950/40 ring-1 ring-white/10"
+            ></div>
+            <div
+              class="h-12 animate-pulse rounded-2xl bg-slate-950/40 ring-1 ring-white/10"
+            ></div>
+            <div
+              class="h-12 animate-pulse rounded-2xl bg-slate-950/40 ring-1 ring-white/10"
+            ></div>
+          </div>
+        </section>
+      {/if}
     </section>
 
     {#if pending && generated?.type === "plan"}
@@ -297,9 +326,11 @@
                   {task.description}
                 </div>
               {/if}
-              <div class="mt-2 text-xs text-slate-400">
-                {#if task.estimate}Task Size: {task.estimate}{/if}
-              </div>
+              {#if task.estimate}
+                <div class="mt-2 text-xs text-slate-400">
+                  Task Size: {task.estimate}
+                </div>
+              {/if}
             </li>
           {/each}
         </ol>
@@ -351,7 +382,7 @@
     {/if}
 
     <section class="mx-auto mt-20 max-w-6xl">
-      <ProjectsSection {projects} {loading} onDelete={onDeleteProject} />
+      <ProjectsSection {projects} {loading} />
     </section>
   </main>
 </div>

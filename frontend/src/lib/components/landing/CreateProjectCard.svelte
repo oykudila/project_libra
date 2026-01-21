@@ -31,7 +31,8 @@
 
   onMount(() => {
     requestAnimationFrame(() => {
-      (document.getElementById(idTitle) as HTMLInputElement | null)?.focus();
+      const el = document.getElementById(idTitle);
+      if (el instanceof HTMLInputElement && !creating) el.focus();
     });
   });
 </script>
@@ -48,16 +49,11 @@
       <div
         class="flex h-full flex-col items-center justify-center gap-3 px-6 text-center"
       >
-        <div
-          class="h-10 w-10 animate-spin rounded-full border-[4px] border-white/15 border-t-white border-r-white/70"
-          aria-hidden="true"
-        ></div>
-
         <div class="text-sm font-semibold text-slate-100">
           Generating your plan…
         </div>
         <div class="text-xs text-slate-300">
-          Turning your goal into milestones and tasks
+          Turning your goals into milestones and tasks
         </div>
 
         <div
@@ -92,7 +88,7 @@
       </div>
 
       <div class="grid gap-2">
-        <Label for={idGoal} class="text-slate-200">Goal</Label>
+        <Label for={idGoal} class="text-slate-200">Goals</Label>
         <Textarea
           id={idGoal}
           class="bg-slate-950/40 text-slate-100 ring-1 ring-white/10 placeholder:text-slate-500"
@@ -129,7 +125,7 @@
             value={hours_per_week ?? ""}
             placeholder="e.g., 6"
             disabled={creating}
-            oninput={(e: Event) => {
+            oninput={(e) => {
               const n = (e.currentTarget as HTMLInputElement).valueAsNumber;
               hours_per_week = Number.isFinite(n) ? n : null;
             }}

@@ -33,7 +33,8 @@
   let descDraft = "";
 
   let titleInput: HTMLInputElement | null = null;
-  let descTextarea: HTMLTextAreaElement | null = null;
+
+  const dndBaseOptions = { flipDurationMs: 140, type: "TASK" as const };
 
   function handleConsider(e: CustomEvent<DndEvent<TaskResponse>>) {
     onItemsChange(status, e.detail.items, false);
@@ -43,25 +44,22 @@
     onItemsChange(status, e.detail.items, true);
   }
 
-  function stopEvent(e: Event) {
-    e.preventDefault();
-    e.stopPropagation();
+  function resetDraft() {
+    titleDraft = "";
+    descDraft = "";
+    creating = false;
   }
 
   async function openAdd() {
     adding = true;
-    creating = false;
-    titleDraft = "";
-    descDraft = "";
+    resetDraft();
     await tick();
     titleInput?.focus();
   }
 
   function cancelAdd() {
     adding = false;
-    creating = false;
-    titleDraft = "";
-    descDraft = "";
+    resetDraft();
   }
 
   async function submitAdd() {
@@ -69,7 +67,6 @@
 
     const t = titleDraft.trim();
     const d = descDraft.trim();
-
     if (!t) return;
 
     creating = true;
@@ -101,7 +98,7 @@
         type="button"
         class="rounded-xl bg-white/10 px-3 py-2 text-xs font-semibold text-white ring-1 ring-white/10 hover:bg-white/15 disabled:opacity-50"
         on:click|stopPropagation={openAdd}
-        disabled={adding}
+        disabled={adding || creating}
         title="Add a new task"
       >
         + Add
@@ -125,7 +122,6 @@
       />
 
       <textarea
-        bind:this={descTextarea}
         class="mt-2 w-full resize-none rounded-xl bg-white/5 px-3 py-2 text-sm text-slate-200 ring-1 ring-white/10"
         rows="3"
         placeholder="Description (optional)"

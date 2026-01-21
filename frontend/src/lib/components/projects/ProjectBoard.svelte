@@ -8,26 +8,31 @@
 
   export let project: ProjectDetailResponse | null = null;
   export let loading = false;
+  export let saving = false;
   export let error = "";
 
   export let onBack: () => void;
-  export let onRefresh: () => void | Promise<void>;
   export let onDelete: () => void | Promise<void>;
   export let onDeleteTask: (taskId: number) => void | Promise<void>;
   export let onCreateTask: (
     status: TaskStatus,
     payload: { title: string; description?: string },
   ) => void | Promise<void>;
-
   export let onEditTask: (
     taskId: number,
     patch: { title?: string; description?: string },
   ) => void | Promise<void>;
 
-  // Parent persistence hook: called on finalize with flattened tasks
   export let onCommit: (
     tasks: Array<{ id: number; status: TaskStatus; order_index: number }>,
   ) => void | Promise<void>;
+
+  const STATUSES = ["todo", "in_progress", "done"] as const;
+  const COLUMNS: Array<{ title: string; status: TaskStatus }> = [
+    { title: "To Do", status: "todo" },
+    { title: "In progress", status: "in_progress" },
+    { title: "Done", status: "done" },
+  ];
 
   let cols: Record<TaskStatus, TaskResponse[]> = {
     todo: [],
@@ -36,40 +41,41 @@
   };
 
   $: if (project) {
+    const next: Record<TaskStatus, TaskResponse[]> = {
+      todo: [],
+      in_progress: [],
+      done: [],
+    };
+
     const sorted = project.tasks
       .slice()
       .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
 
-    cols = {
-      todo: sorted.filter((t) => t.status === "todo"),
-      in_progress: sorted.filter((t) => t.status === "in_progress"),
-      done: sorted.filter((t) => t.status === "done"),
-    };
+    for (const t of sorted) {
+      const s: TaskStatus =
+        t.status === "in_progress" || t.status === "done" ? t.status : "todo";
+      next[s].push(t);
+    }
+    cols = next;
   } else {
     cols = { todo: [], in_progress: [], done: [] };
   }
 
-  function normalizeAndFlatten(): Array<{
-    id: number;
-    status: TaskStatus;
-    order_index: number;
-  }> {
+  function normalizeAndFlatten() {
     const out: Array<{ id: number; status: TaskStatus; order_index: number }> =
       [];
-    (["todo", "in_progress", "done"] as const).forEach((s) => {
-      cols[s].forEach((t, i) => {
-        out.push({ id: t.id, status: s, order_index: i });
-      });
-    });
+    for (const s of STATUSES) {
+      cols[s].forEach((t, i) =>
+        out.push({ id: t.id, status: s, order_index: i }),
+      );
+    }
     return out;
   }
 
   async function handleDeleteProject() {
     if (!project) return;
-
     const ok = confirm(`Delete "${project.title}"? This cannot be undone.`);
     if (!ok) return;
-
     await onDelete();
   }
 
@@ -78,15 +84,10 @@
     next: TaskResponse[],
     isFinal: boolean,
   ) {
-    // Update the local column list to keep the gap animation smooth
     cols = { ...cols, [status]: next.map((t) => ({ ...t, status })) };
 
-    // When moving across columns, svelte-dnd-action will also emit for origin/destination,
-    // so by the time you drop, both columns should be updated through this handler. :contentReference[oaicite:6]{index=6}
-
     if (isFinal) {
-      const flattened = normalizeAndFlatten();
-      await onCommit(flattened);
+      await onCommit(normalizeAndFlatten());
     }
   }
 </script>
@@ -121,20 +122,11 @@
     </div>
 
     <div class="flex items-center gap-3">
-      <!-- <button
-        type="button"
-        class="rounded-2xl bg-white/10 px-4 py-2 text-sm font-semibold text-white ring-1 ring-white/10 hover:bg-white/15 disabled:opacity-50"
-        on:click={() => onRefresh()}
-        disabled={loading}
-      >
-        Refresh
-      </button> -->
-
       <button
         type="button"
         class="rounded-2xl bg-red-500/15 px-4 py-2 text-sm font-semibold text-red-200 ring-1 ring-red-500/30 hover:bg-red-500/25 disabled:opacity-50"
         on:click={handleDeleteProject}
-        disabled={loading || !project}
+        disabled={loading || saving || !project}
         title="Delete this project"
       >
         Delete
@@ -169,33 +161,17 @@
     </div>
   {:else}
     <div class="grid gap-4 lg:grid-cols-3">
-      <KanbanColumn
-        title="To do"
-        status="todo"
-        items={cols.todo}
-        onItemsChange={handleItemsChange}
-        {onDeleteTask}
-        {onEditTask}
-        {onCreateTask}
-      />
-      <KanbanColumn
-        title="In progress"
-        status="in_progress"
-        items={cols.in_progress}
-        onItemsChange={handleItemsChange}
-        {onDeleteTask}
-        {onEditTask}
-        {onCreateTask}
-      />
-      <KanbanColumn
-        title="Done"
-        status="done"
-        items={cols.done}
-        onItemsChange={handleItemsChange}
-        {onDeleteTask}
-        {onEditTask}
-        {onCreateTask}
-      />
+      {#each COLUMNS as col (col.status)}
+        <KanbanColumn
+          title={col.title}
+          status={col.status}
+          items={cols[col.status]}
+          onItemsChange={handleItemsChange}
+          {onDeleteTask}
+          {onEditTask}
+          {onCreateTask}
+        />
+      {/each}
     </div>
   {/if}
 </div>

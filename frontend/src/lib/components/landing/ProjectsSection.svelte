@@ -6,14 +6,6 @@
   export let projects: ProjectResponse[] = [];
   export let loading = false;
   export let highlight = false;
-  export let onDelete: (id: number) => void;
-
-  function handleDelete(e: MouseEvent, id: number) {
-    // prevent the outer "open project" click
-    e.preventDefault();
-    e.stopPropagation();
-    onDelete?.(id);
-  }
 </script>
 
 <section
@@ -27,7 +19,7 @@
         <div class="flex items-center gap-2">
           <h2
             class="text-xl font-extrabold tracking-tight transition
-                 {highlight
+              {highlight
               ? 'text-white drop-shadow-[0_0_18px_rgba(255,255,255,0.35)]'
               : ''}"
           >
@@ -36,14 +28,15 @@
 
           <span
             class="h-2 w-2 rounded-full transition-opacity
-                 {highlight ? 'opacity-100 animate-pulse' : 'opacity-0'}"
+              {highlight ? 'opacity-100 animate-pulse' : 'opacity-0'}"
             style="background: rgba(255,255,255,0.6);"
             aria-hidden="true"
           ></span>
         </div>
+
         <span
           class="inline-flex items-center rounded-full bg-white/5 px-2.5 py-1 text-xs
-               font-semibold text-slate-200 ring-1 ring-white/10"
+            font-semibold text-slate-200 ring-1 ring-white/10"
           aria-label={`Project count: ${projects.length}`}
         >
           {projects.length}
@@ -76,7 +69,11 @@
   {:else}
     <div class="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
       {#each projects as p (p.id)}
-        <button class="text-left" on:click={() => goto(`/projects/${p.id}`)}>
+        <button
+          type="button"
+          class="text-left"
+          on:click={() => goto(`/projects/${p.id}`)}
+        >
           <Card
             class="rounded-3xl bg-white/5 text-slate-100 ring-1 ring-white/10 transition hover:bg-white/10 hover:ring-white/20"
           >
@@ -88,7 +85,6 @@
                     {p.goal_text}
                   </div>
                 </div>
-                <div class="flex items-start gap-2"></div>
               </div>
 
               <div class="mt-4 flex items-end gap-3">

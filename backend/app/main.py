@@ -1,18 +1,16 @@
 from pathlib import Path
+
 from dotenv import load_dotenv
-
-ENV_PATH = Path(__file__).resolve().parent.parent / ".env"
-load_dotenv(dotenv_path=ENV_PATH)
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from . import models
-from .database import Base, engine
 from .routes import projects, plans, tasks
 
 
 def create_app() -> FastAPI:
+    env_path = Path(__file__).resolve().parent.parent / ".env"
+    load_dotenv(dotenv_path=env_path)
+
     app = FastAPI()
 
     app.add_middleware(

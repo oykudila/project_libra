@@ -5,6 +5,7 @@ import json
 import hashlib
 from typing import Dict, Optional
 
+from fastapi.encoders import jsonable_encoder
 from openai import OpenAI
 
 from .schemas import PlanGenerateInput, PlanResponse, PlanReviseInput
@@ -21,18 +22,49 @@ def _clean_opt(v: Optional[str]) -> Optional[str]:
     return s if s else None
 
 
-def _cache_key(p: PlanGenerateInput) -> str:
-    parts = [
-        (p.goal_text or "").strip(),
-        str(_clean_opt(p.deadline) or ""),
-        str(p.hours_per_week if p.hours_per_week is not None else ""),
-        str(p.experience_level or ""),
-        str(p.detail_level or ""),
-        str(_clean_opt(p.constraints) or ""),
-        os.getenv("OPENAI_MODEL", "gpt-4.1-mini"),
+def _model_name() -> str:
+    return os.getenv("OPENAI_MODEL", "gpt-4.1-mini")
+
+
+_SYSTEM_PROMPT = (
+    "You are a planning assistant. Convert the user's goal into an actionable plan.\n"
+    "Return ONLY PlanResponse JSON. No commentary.\n"
+    "Constraints:\n"
+    "- milestones: exactly 3\n"
+    "- If DETAIL=simple: 8 tasks total.\n"
+    "- If DETAIL=detailed: 8–12 tasks total.\n"
+    "- task.title: short verb phrase; one action\n"
+    "- task.description: short how-to instruction\n"
+    "- milestone_index: 0|1|2\n"
+    "- order_index: 0.. within each milestone\n"
+    "- status: todo|in_progress|done (default todo)\n"
+    "- estimate: S|M|L (omit if unsure)\n"
+    "- No extra fields.\n"
+    "Adjust for EXPERIENCE.\n"
+)
+
+
+def _format_common_user_lines(
+    payload: PlanGenerateInput | PlanReviseInput,
+) -> list[str]:
+    deadline = _clean_opt(payload.deadline)
+    constraints = _clean_opt(payload.constraints)
+    exp = payload.experience_level or "beginner"
+    detail = payload.detail_level or "simple"
+
+    lines = [
+        f"GOAL: {payload.goal_text.strip()}",
+        f"EXPERIENCE: {exp}",
+        f"DETAIL: {detail}",
     ]
-    raw = "|".join(parts).encode("utf-8", errors="ignore")
-    return hashlib.sha256(raw).hexdigest()
+    if deadline:
+        lines.append(f"DEADLINE: {deadline}")
+    if payload.hours_per_week is not None:
+        lines.append(f"HOURS_PER_WEEK: {payload.hours_per_week}")
+    if constraints:
+        lines.append(f"CONSTRAINTS: {constraints}")
+
+    return lines
 
 
 def _normalize_plan(plan: PlanResponse) -> PlanResponse:
@@ -78,51 +110,7 @@ def get_openai_client() -> OpenAI:
     return _client
 
 
-def generate_plan(payload: PlanGenerateInput) -> PlanResponse:
-    key = _cache_key(payload)
-    if key in _cache:
-        return _cache[key]
-
-    model = os.getenv("OPENAI_MODEL", "gpt-4.1-mini")
-
-    system = (
-        "You are a planning assistant. Convert the user's goal into an actionable plan.\n"
-        "Return a SHORT plan in PlanResponse JSON only.\n"
-        "Hard rules:\n"
-        "- Exactly 3 milestones.\n"
-        "- 8–12 tasks total.\n"
-        "- Each task is one action.\n"
-        "- milestone_index must be 0,1,2.\n"
-        "- order_index starts at 0 within each milestone.\n"
-        "- status must be todo, in_progress, or done (default todo).\n"
-        "- estimate must be S, M, or L (omit if unsure).\n"
-        "- No extra fields. No commentary.\n"
-        "\n"
-        "Adapt to EXPERIENCE:\n"
-        "- beginner: assume no prior knowledge, include setup + fundamentals, smaller steps, more guidance.\n"
-        "- intermediate: assume basics are known, fewer setup tasks, focus on practice/projects, moderate steps.\n"
-        "- advanced: assume strong fundamentals, skip basics, focus on optimization, depth, and real deliverables.\n"
-    )
-
-    deadline = _clean_opt(payload.deadline)
-    constraints = _clean_opt(payload.constraints)
-    exp = payload.experience_level or "beginner"
-    detail = payload.detail_level or "simple"
-
-    lines = [
-        f"GOAL: {payload.goal_text.strip()}",
-        f"EXPERIENCE: {exp}",
-        f"DETAIL: {detail}",
-    ]
-    if deadline:
-        lines.append(f"DEADLINE: {deadline}")
-    if payload.hours_per_week is not None:
-        lines.append(f"HOURS_PER_WEEK: {payload.hours_per_week}")
-    if constraints:
-        lines.append(f"CONSTRAINTS: {constraints}")
-
-    user = "\n".join(lines)
-
+def _call_plan(model: str, system: str, user: str) -> PlanResponse:
     client = get_openai_client()
     resp = client.responses.parse(
         model=model,
@@ -130,28 +118,36 @@ def generate_plan(payload: PlanGenerateInput) -> PlanResponse:
             {"role": "system", "content": system},
             {"role": "user", "content": user},
         ],
+        max_output_tokens=900,
+        temperature=0.2,
         text_format=PlanResponse,
     )
     plan = resp.output_parsed
     if not plan or plan.type != "plan":
         raise RuntimeError("AI did not return a valid plan response.")
+    return _normalize_plan(plan)
 
-    plan = _normalize_plan(plan)
 
-    _cache[key] = plan
-    return plan
+def _cache_key_generate(p: PlanGenerateInput) -> str:
+    parts = [
+        p.goal_text.strip(),
+        _clean_opt(p.deadline) or "",
+        str(p.hours_per_week if p.hours_per_week is not None else ""),
+        str(p.experience_level or ""),
+        str(p.detail_level or ""),
+        _clean_opt(p.constraints) or "",
+        _model_name(),
+    ]
+    raw = "|".join(parts).encode("utf-8", errors="ignore")
+    return hashlib.sha256(raw).hexdigest()
 
 
 def _plan_for_revision_context(plan: PlanResponse) -> dict:
     return {
-        "milestones": [
-            {"title": m.title, "description": m.description or ""}
-            for m in plan.milestones
-        ],
+        "milestones": [{"title": m.title} for m in plan.milestones],
         "tasks": [
             {
                 "title": t.title,
-                "description": t.description or "",
                 "milestone_index": t.milestone_index,
                 "estimate": t.estimate,
             }
@@ -160,21 +156,26 @@ def _plan_for_revision_context(plan: PlanResponse) -> dict:
     }
 
 
-def _revise_cache_key(p: PlanReviseInput) -> str:
-    model = os.getenv("OPENAI_MODEL", "gpt-4.1-mini")
+def _cache_key_revise(p: PlanReviseInput) -> str:
+    model = _model_name()
+    current_plan_jsonable = jsonable_encoder(p.current_plan)
+
     current_hash = hashlib.sha256(
-        json.dumps(p.current_plan, sort_keys=True, separators=(",", ":")).encode(
-            "utf-8", errors="ignore"
-        )
+        json.dumps(
+            current_plan_jsonable,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+        ).encode("utf-8", errors="ignore")
     ).hexdigest()
 
     parts = [
-        (p.goal_text or "").strip(),
-        str(_clean_opt(p.deadline) or ""),
+        p.goal_text.strip(),
+        _clean_opt(p.deadline) or "",
         str(p.hours_per_week if p.hours_per_week is not None else ""),
         str(p.experience_level or ""),
         str(p.detail_level or ""),
-        str(_clean_opt(p.constraints) or ""),
+        _clean_opt(p.constraints) or "",
         current_hash,
         (p.adjustment or "").strip(),
         model,
@@ -183,52 +184,35 @@ def _revise_cache_key(p: PlanReviseInput) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
+def generate_plan(payload: PlanGenerateInput) -> PlanResponse:
+    key = _cache_key_generate(payload)
+    cached = _cache.get(key)
+    if cached:
+        return cached
+
+    model = _model_name()
+    user = "\n".join(_format_common_user_lines(payload))
+
+    plan = _call_plan(model=model, system=_SYSTEM_PROMPT, user=user)
+    _cache[key] = plan
+    return plan
+
+
 def revise_plan(payload: PlanReviseInput) -> PlanResponse:
-    key = _revise_cache_key(payload)
-    if key in _revise_cache:
-        return _revise_cache[key]
+    key = _cache_key_revise(payload)
+    cached = _revise_cache.get(key)
+    if cached:
+        return cached
 
-    model = os.getenv("OPENAI_MODEL", "gpt-4.1-mini")
+    model = _model_name()
 
-    try:
-        current = PlanResponse.model_validate(payload.current_plan)
-    except Exception as e:
-        raise RuntimeError(f"current_plan is not a valid PlanResponse: {e}")
+    current = PlanResponse.model_validate(payload.current_plan)
+    ctx = jsonable_encoder(_plan_for_revision_context(current))
 
-    system = (
-        "Return ONLY PlanResponse JSON.\n"
-        "Rules: exactly 3 milestones; 8-12 tasks; each task is one action; "
-        "milestone_index in 0,1,2; order_index starts at 0 per milestone; "
-        "status in todo|in_progress|done; estimate S|M|L or omit; "
-        "no extra fields; no commentary.\n"
-        "\n"
-        "Adapt to EXPERIENCE:\n"
-        "- beginner: add setup/fundamentals, smaller steps, more guidance.\n"
-        "- intermediate: skip trivial basics, focus on practice/projects.\n"
-        "- advanced: skip basics, focus on depth, optimization, and strong deliverables.\n"
-        "Preserve what still fits; apply the user's adjustment."
-    )
-
-    deadline = _clean_opt(payload.deadline)
-    constraints = _clean_opt(payload.constraints)
-    exp = payload.experience_level or "beginner"
-    detail = payload.detail_level or "simple"
-
-    # send a compact plan context instead of full dump
-    ctx = _plan_for_revision_context(current)
-
+    user_lines = _format_common_user_lines(payload)
     user = "\n".join(
         [
-            f"GOAL: {payload.goal_text.strip()}",
-            f"EXPERIENCE: {exp}",
-            f"DETAIL: {detail}",
-            *([f"DEADLINE: {deadline}"] if deadline else []),
-            *(
-                [f"HOURS_PER_WEEK: {payload.hours_per_week}"]
-                if payload.hours_per_week is not None
-                else []
-            ),
-            *([f"CONSTRAINTS: {constraints}"] if constraints else []),
+            *user_lines,
             "CURRENT_PLAN_SUMMARY_JSON:",
             json.dumps(ctx, separators=(",", ":"), ensure_ascii=False),
             "ADJUSTMENT:",
@@ -236,20 +220,11 @@ def revise_plan(payload: PlanReviseInput) -> PlanResponse:
         ]
     )
 
-    client = get_openai_client()
-    resp = client.responses.parse(
+    plan = _call_plan(
         model=model,
-        input=[
-            {"role": "system", "content": system},
-            {"role": "user", "content": user},
-        ],
-        text_format=PlanResponse,
+        system=_SYSTEM_PROMPT
+        + "\nPreserve what still fits; apply the user's adjustment.",
+        user=user,
     )
-
-    plan = resp.output_parsed
-    if not plan or plan.type != "plan":
-        raise RuntimeError("AI did not return a valid plan response.")
-
-    plan = _normalize_plan(plan)
     _revise_cache[key] = plan
     return plan

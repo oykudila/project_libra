@@ -1,11 +1,24 @@
 const BASE_URL = "http://localhost:8000";
+
+// --- Errors ---
 type ApiErrorBody = { detail?: string };
+export class ApiError extends Error {
+  status: number;
+  detail?: string;
+
+  constructor(status: number, message: string, detail?: string) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.detail = detail;
+  }
+}
 
 // -----------------------------
 export type TaskStatus = "todo" | "in_progress" | "done";
 export type TaskSize = "S" | "M" | "L";
 
-// -----------------------------
+// --- API Responses ---
 export type ProjectResponse = {
   id: number;
   title: string;
@@ -37,7 +50,7 @@ export type ProjectDetailResponse = ProjectResponse & {
   tasks: TaskResponse[];
 };
 
-// -----------------------------
+// --- Requests ---
 export type ProjectCreateRequest = {
   title: string;
   goal_text: string;
@@ -71,7 +84,7 @@ export type PlanGenerateInput = {
   goal_text: string;
   deadline?: string | null;
   hours_per_week?: number | null;
-  experience_level?: "beginner" | "intermediate" | "advanced" | null;
+  experience_level?: "beginner" | "intermediate" | "advanced";
   detail_level?: "simple" | "detailed";
   constraints?: string | null;
 };
@@ -104,7 +117,7 @@ export type RevisePlanInput = {
   goal_text: string;
   deadline?: string | null;
   hours_per_week?: number | null;
-  experience_level?: "beginner" | "intermediate" | "advanced" | null;
+  experience_level?: "beginner" | "intermediate" | "advanced";
   detail_level?: "simple" | "detailed" | null;
   constraints?: string | null;
   current_plan: GeneratePlanResponse;
@@ -117,7 +130,12 @@ export type PlanApplyInput = {
 };
 
 // -----------------------------
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+type RequestOptions = RequestInit & { signal?: AbortSignal };
+
+async function request<T>(
+  path: string,
+  options: RequestOptions = {},
+): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, {
     ...options,
     headers: {
@@ -127,94 +145,135 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   });
 
   if (!res.ok) {
-    let detail = "";
+    let detail: string | undefined;
     try {
       const data = (await res.json()) as ApiErrorBody;
-      if (data?.detail) detail = `: ${data.detail}`;
-    } catch (err) {
-      // ignore JSON parse errors, raise HTTP errors
+      detail = data?.detail;
+    } catch {
+      // ignore JSON parse errors
     }
-    throw new Error(`API error ${res.status}${detail}`);
+    const message = detail
+      ? `API error ${res.status}: ${detail}`
+      : `API error ${res.status}`;
+    throw new ApiError(res.status, message, detail);
   }
+
+  if (res.status === 204) return undefined as T;
+
   return (await res.json()) as T;
 }
 
-export async function deleteProject(
-  projectId: number,
-): Promise<{ ok: boolean }> {
-  const response = await fetch(`${BASE_URL}/projects/${projectId}`, {
-    method: "DELETE",
-  });
-  if (!response.ok) throw new Error(await response.text());
-  return await response.json();
+// --- Projects ---
+export function listProjects(signal?: AbortSignal) {
+  return request<ProjectResponse[]>("/projects", { signal });
 }
 
-export function revisePlan(projectId: number, payload: RevisePlanInput) {
-  return request<GeneratePlanResponse>(`/projects/${projectId}/plan/revise`, {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
-}
-
-export function listProjects() {
-  return request<ProjectResponse[]>("/projects");
-}
-
-export function createProject(payload: ProjectCreateRequest) {
+export function createProject(
+  payload: ProjectCreateRequest,
+  signal?: AbortSignal,
+) {
   return request<ProjectResponse>("/projects", {
     method: "POST",
     body: JSON.stringify(payload),
+    signal,
   });
 }
 
-export function getProject(projectId: number) {
-  return request<ProjectDetailResponse>(`/projects/${projectId}`);
+export function getProject(projectId: number, signal?: AbortSignal) {
+  return request<ProjectDetailResponse>(`/projects/${projectId}`, { signal });
 }
 
-export function generatePlan(projectId: number, payload: PlanGenerateInput) {
-  return request<GeneratePlanResponse>(`/projects/${projectId}/plan/generate`, {
-    method: "POST",
-    body: JSON.stringify(payload),
+export function deleteProject(projectId: number, signal?: AbortSignal) {
+  return request<{ ok: boolean }>(`/projects/${projectId}`, {
+    method: "DELETE",
+    signal,
   });
 }
 
-export function applyPlan(projectId: number, payload: PlanApplyInput) {
-  return request<ProjectDetailResponse>(`/projects/${projectId}/plan/apply`, {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
-}
-
-export function updateTask(taskId: number, patch: TaskUpdateRequest) {
-  return request<TaskResponse>(`/tasks/${taskId}`, {
-    method: "PATCH",
-    body: JSON.stringify(patch),
-  });
-}
-
-export async function deleteTask(taskId: number): Promise<{ ok: boolean }> {
-  const res = await fetch(`${BASE_URL}/tasks/${taskId}`, { method: "DELETE" });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-
-export function createTask(payload: TaskCreateRequest) {
+// --- Tasks ---
+export function createTask(payload: TaskCreateRequest, signal?: AbortSignal) {
   return request<TaskResponse>("/tasks", {
     method: "POST",
     body: JSON.stringify(payload),
+    signal,
   });
 }
 
-export function generatePlanDraft(payload: PlanGenerateInput) {
+export function updateTask(
+  taskId: number,
+  patch: TaskUpdateRequest,
+  signal?: AbortSignal,
+) {
+  return request<TaskResponse>(`/tasks/${taskId}`, {
+    method: "PATCH",
+    body: JSON.stringify(patch),
+    signal,
+  });
+}
+
+export function deleteTask(taskId: number, signal?: AbortSignal) {
+  return request<{ ok: boolean }>(`/tasks/${taskId}`, {
+    method: "DELETE",
+    signal,
+  });
+}
+
+// --- Plans ---
+export function generatePlan(
+  projectId: number,
+  payload: PlanGenerateInput,
+  signal?: AbortSignal,
+) {
+  return request<GeneratePlanResponse>(`/projects/${projectId}/plan/generate`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+    signal,
+  });
+}
+
+export function revisePlan(
+  projectId: number,
+  payload: RevisePlanInput,
+  signal?: AbortSignal,
+) {
+  return request<GeneratePlanResponse>(`/projects/${projectId}/plan/revise`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+    signal,
+  });
+}
+
+export function applyPlan(
+  projectId: number,
+  payload: PlanApplyInput,
+  signal?: AbortSignal,
+) {
+  return request<ProjectDetailResponse>(`/projects/${projectId}/plan/apply`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+    signal,
+  });
+}
+
+// --- Draft plans ---
+export function generatePlanDraft(
+  payload: PlanGenerateInput,
+  signal?: AbortSignal,
+) {
   return request<GeneratePlanResponse>("/plan/generate", {
     method: "POST",
     body: JSON.stringify(payload),
+    signal,
   });
 }
 
-export function revisePlanDraft(payload: RevisePlanInput) {
+export function revisePlanDraft(
+  payload: RevisePlanInput,
+  signal?: AbortSignal,
+) {
   return request<GeneratePlanResponse>("/plan/revise", {
     method: "POST",
     body: JSON.stringify(payload),
+    signal,
   });
 }
