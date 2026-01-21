@@ -48,7 +48,9 @@ Users can also view and manage existing projects in the same space for continuit
 
 ---
 
-## Features (Current MVP)
+## MVP
+
+**Features**
 
 - AI plan generation from goal input
 - AI plan revision based on user feedback
@@ -90,7 +92,7 @@ Users can also view and manage existing projects in the same space for continuit
 - **Frontend** handles all user interaction and AI state (loading, revisions, task updates).
 - **Backend** handles API routes for generating and revising plans, AI calls, persistance, and caching.
 
-**Intentional tradeoffs**
+**Tradeoffs**
 
 - **Local persistence only**
   Data is stored locally.
@@ -120,7 +122,3 @@ Users can also view and manage existing projects in the same space for continuit
 - Calendar integration
 - Personalization
 - Notifications and reminders
-
-```
-
-```
