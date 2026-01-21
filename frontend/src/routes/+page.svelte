@@ -89,7 +89,7 @@
         return;
       }
 
-      const delay = 150 + Math.random() * 500;
+      const delay = 80 + Math.random() * 150;
       typingTimer = setTimeout(tick, delay);
     }
 
@@ -175,7 +175,6 @@
       });
 
       resetGenerated();
-      await refresh();
       goto(`/projects/${created.id}`);
     } catch (e: unknown) {
       error = e instanceof Error ? e.message : "Failed to create/apply plan";

@@ -121,14 +121,14 @@
     </div>
 
     <div class="flex items-center gap-3">
-      <button
+      <!-- <button
         type="button"
         class="rounded-2xl bg-white/10 px-4 py-2 text-sm font-semibold text-white ring-1 ring-white/10 hover:bg-white/15 disabled:opacity-50"
         on:click={() => onRefresh()}
         disabled={loading}
       >
         Refresh
-      </button>
+      </button> -->
 
       <button
         type="button"

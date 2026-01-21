@@ -64,8 +64,6 @@ class ProjectDetailResponse(ProjectResponse):
 
 
 # AI
-
-
 class PlanGenerateInput(BaseModel):
     goal_text: str
     deadline: Optional[str] = None
