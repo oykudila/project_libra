@@ -64,7 +64,7 @@ Users can also view and manage existing projects in the same space for continuit
 
 **UX and AI interaction**
 
-- Interacting with the AI is structured, there is no AI chat distraction
+- Interacting with the AI is straightforward
 - Instructions are predefined and guided, reducing the effort to phrase prompts
 - Output is actionable steps, not long texts of advice
 - Loading states are explicit
@@ -73,10 +73,10 @@ Users can also view and manage existing projects in the same space for continuit
 
 **AI Design**
 
-- The AI responses are not free-form advice.
-- Responses are constrained to a structured format to create tasks.
-- Prompts are predefined and contextual.
-- Plan revision reuses existing context instead of regenerating from scratch.
+- The AI responses are not free-form advice
+- Responses are constrained to a structured format to create tasks
+- Prompts are predefined and contextual
+- Plan revision reuses existing context instead of regenerating from scratch
 
 ---
 
@@ -102,29 +102,25 @@ Users can also view and manage existing projects in the same space for continuit
 
 **Flow**
 
-1. User submits a high-level goal via the frontend.
-2. Frontend calls the FastAPI backend.
-3. Backend constructs a structured AI prompt and calls the OpenAI API.
-4. The generated plan is validated, cached, and persisted locally.
-5. Frontend renders tasks and allows user-driven revisions.
+1. User submits a high-level goal via the frontend
+2. Frontend calls the FastAPI backend
+3. Backend constructs a structured AI prompt and calls the OpenAI API
+4. The generated plan is validated, cached, and persisted locally
+5. Frontend renders tasks and allows user-driven revisions
 
-- **Frontend** handles all user interaction and AI state (loading, revisions, task updates).
+- **Frontend** handles all user interaction and AI state (loading, revisions, task updates)
 
-- **Backend** handles API routes for generating and revising plans, AI calls, persistance, and caching.
+- **Backend** handles API routes for generating and revising plans, AI calls, persistance, and caching
 
 **Tradeoffs**
 
-- **Local persistence only**
-  Data is stored locally.
+- Local persistence only: data is stored locally
 
-- **Focused scope**
-  The tool prioritizes actionable planning, there is no scheduling, reminders, or execution tracking.
+- Focused scope: the tool prioritizes actionable planning, there is no scheduling, reminders, or execution tracking
 
-- **Reduced AI complexity**
-  Simple models and prompts instead of complex multi-agent systems.
+- Reduced AI complexity: simple models and prompts instead of complex multi-agent systems
 
-- **Cache management**
-  AI responses are cached locally to improve performance, but cache eviction and cleanup are not yet implemented and would be required
+- Cache management: AI responses are cached locally to improve performance, but cache eviction and cleanup are not yet implemented and would be required
 
 ---
 
