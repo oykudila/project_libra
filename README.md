@@ -28,6 +28,12 @@ npm run dev
 
 ---
 
+## Development Diary
+
+I started by defining a determenistic response structure for the AI output to get the main idea in place before spending tokens. I created the Pydanctic schemas first, then shaped the AI prompt to stay within these defined types with its responses. I implemented the routes for generating and revising plans, as well as connecting the local database. I noticed the AI revision responses were quite slow, so I implemented cache to iterate without making redundant calls to the AI, and a seperate cache for creating duplicates or similar projects. Once the backend was up and running as intended, I worked on the frontend. I used shadcn components for the UI and wired the user interactions, loading/creating/saving states.
+
+---
+
 ## Core Idea
 
 AI-powered planning tool to help users break down high-level, abstract goals into clear tasks.
