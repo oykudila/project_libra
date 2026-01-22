@@ -30,15 +30,19 @@ npm run dev
 
 ## Development Diary
 
-I started by defining a determenistic response structure for the AI output to get the main idea in place before spending tokens. I created the Pydanctic schemas first, then shaped the AI prompt to stay within these defined types with its responses. I implemented the routes for generating and revising plans, as well as connecting the local database. I noticed the AI revision responses were quite slow, so I implemented cache to iterate without making redundant calls to the AI, and a seperate cache for creating duplicates or similar projects. Once the backend was up and running as intended, I worked on the frontend. I used shadcn components for the UI and wired the user interactions, loading/creating/saving states.
+I started by defining a determenistic response structure for the AI output before spending time and tokens on the prompt. I defined the Pydanctic schemas first, then shaped the AI prompt to stay within these defined types with its responses.
+
+Next, I implemented the backend routes for generating new plans, revising existing plans with user feedback, and locally persisting projects. During testing, I noticed that the revisions were quite slow because of seperate calls, so I implemented two local caches to avoid redundant AI calls. One cache is for revisions and the other is for detecting and reusing plans for projects that have very similar high-level goals.
+
+Once the backend was up and running as intended, I started on the frontend. I used shadcn/ui components to gain speed on the UI development and to keep a consistent design across pages.I prioritised making the loading and generation states clear, and ensure a flow of `create plan -> revise plan -> save plan as project`.
 
 ---
 
 ## Core Idea
 
-AI-powered planning tool to help users break down high-level, abstract goals into clear tasks.
+AI-powered planning tool that helps users break down high-level, abstract goals into clear tasks. The aim is for users to spend less time on planning and more time on doing.
 
-This tool focuses on **structured thinking and execution**, the environment is minimal, built for a specific purpose without distractions and comes with filters. Users do not have to spend their time planning, they can get to doing. I used **Svelte** and **FastAPI** to familiarize myself with the Libra tech stack while building this MVP :)
+This tool focuses on **structured thinking and execution**, the environment is minimal, built for a specific purpose without distractions. Instead of thinking about how to prompt the AI, users can get right into reviewing and acting on structured plans. I used **Svelte** and **FastAPI** to familiarize myself with the Libra tech stack while building this MVP :)
 
 **User Problem**
 
@@ -68,21 +72,27 @@ Users can also view and manage existing projects in the same space for continuit
 
 ---
 
-**UX and AI interaction**
+**UI/UX**
 
-- Interacting with the AI is straightforward
-- Instructions are predefined and guided, reducing the effort to phrase prompts
-- Output is actionable steps, not long texts of advice
-- Loading states are explicit
+- Interacting with the AI is structured rather than conversational
+- Prompts are predefined and guided to reduce user effort
+- AI output is actionable steps instead of long texts of advice
+- Loading and revision states are explicit
 
 ---
 
-**AI Design**
+**More on the AI**
 
-- The AI responses are not free-form advice
-- Responses are constrained to a structured format to create tasks
-- Prompts are predefined and contextual
-- Plan revision reuses existing context instead of regenerating from scratch
+The AI responses are intentionally constrained to avoid acting as a general purpose model. The prompt ensures that we only get consistent JSON responses of actionable tasks that fit in predefined schemas and are easy to render in the UI.
+
+\*_Prompt_
+
+- Creates exactly 3 milestones for the high-level structure (read V2 Plans)
+- Fixed number of tasks to not overwhelm the user or crowd up the project boards
+- Task titles that always start with verbs
+- Short instructions as descriptions
+- Index ordering and milestone grouping
+- Adjust plan according to user's experience level
 
 ---
 
@@ -122,16 +132,17 @@ Users can also view and manage existing projects in the same space for continuit
 
 - Local persistence only: data is stored locally
 
-- Focused scope: the tool prioritizes actionable planning, there is no scheduling, reminders, or execution tracking
+- Focused scope: the tool prioritizes actionable planning, there is no scheduling, reminders, or tracking
 
 - Reduced AI complexity: simple models and prompts instead of complex multi-agent systems
 
-- Cache management: AI responses are cached locally to improve performance, but cache eviction and cleanup are not yet implemented and would be required
+- Cache management: AI responses are cached locally to improve performance, but cache eviction and automatic cleanup would be required for environments with bigger loads
 
 ---
 
 ## V2 Plans
 
+- Milestones act as general guides on a project
 - Clicking a task opens a dedicated board with subtasks
 - In-project AI discussion chat for refining plans
 - Progress tracking and task completion analytics
