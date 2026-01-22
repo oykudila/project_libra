@@ -85,7 +85,7 @@ Users can also view and manage existing projects in the same space for continuit
 
 The AI responses are intentionally constrained to avoid acting as a general purpose model. The prompt ensures that we only get consistent JSON responses of actionable tasks that fit in predefined schemas and are easy to render in the UI.
 
-\*_Prompt_
+**Prompt**
 
 - Creates exactly 3 milestones for the high-level structure (read V2 Plans)
 - Fixed number of tasks to not overwhelm the user or crowd up the project boards
@@ -123,10 +123,6 @@ The AI responses are intentionally constrained to avoid acting as a general purp
 3. Backend constructs a structured AI prompt and calls the OpenAI API
 4. The generated plan is validated, cached, and persisted locally
 5. Frontend renders tasks and allows user-driven revisions
-
-- **Frontend** handles all user interaction and AI state (loading, revisions, task updates)
-
-- **Backend** handles API routes for generating and revising plans, AI calls, persistance, and caching
 
 **Tradeoffs**
 
