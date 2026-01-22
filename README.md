@@ -127,11 +127,8 @@ The AI responses are intentionally constrained to avoid acting as a general purp
 **Tradeoffs**
 
 - Local persistence only: data is stored locally
-
 - Focused scope: the tool prioritizes actionable planning, there is no scheduling, reminders, or tracking
-
 - Reduced AI complexity: simple models and prompts instead of complex multi-agent systems
-
 - Cache management: AI responses are cached locally to improve performance, but cache eviction and automatic cleanup would be required for environments with bigger loads
 
 ---
